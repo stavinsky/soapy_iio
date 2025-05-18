@@ -1,7 +1,7 @@
+
 extern "C" {
 #include <iio/iio-debug.h>
 }
-
 // #include <iio/iio.h>
 
 #include <SoapySDR/Device.hpp>
@@ -24,54 +24,44 @@ extern "C" {
             (void)abort();                                                           \
         }                                                                            \
     }
-static char* get_ch_name(const char* type, int id) {
-    static char tmpstr[64];
-    snprintf(tmpstr, sizeof(tmpstr), "%s%d", type, id);
-    return tmpstr;
-}
-struct DummyStream {
+
+class DummyStream {
+   public:
     int direction;
     std::string format;
     std::vector<size_t> channels;
-    struct iio_device* rx;
-    size_t rx_sample_sz;
-    struct iio_context* ctx;
-    struct iio_channel* rx_ch_i;
-    struct iio_channel* rx_ch_q;
-    struct iio_channels_mask* rx_mask;
     struct iio_buffer* rx_buffer;
     struct iio_stream* rx_stream;
     bool current_buffer_finished = true;
+    iio_channels_mask* rx_mask;
 
     int16_t* p_dat;
     int16_t* p_end;
+    iio_channel* rx_ch_i;
+    iio_channel* rx_ch_q;
     bool active = false;
+    iio_device* device;
+    const iio_block* rx_block;
+
+    void rx_channel_enable();
+    ssize_t get_rx_sample_size();
+    DummyStream(iio_device* device);
+    void prepare_next_block() {
+        SoapySDR_logf(SOAPY_SDR_TRACE, "prepare block");
+        rx_block = iio_stream_get_next_block(rx_stream);
+        int err = iio_err(rx_block);
+        if (err) {
+            throw std::runtime_error("unable to receive block");
+        }
+        p_end = reinterpret_cast<int16_t*>(iio_block_end(rx_block));
+        current_buffer_finished = false;
+        p_dat = reinterpret_cast<int16_t*>(iio_block_first(rx_block, rx_ch_i));
+    }
 };
-
-static bool get_ad9361_stream_dev(enum iodev d, struct iio_device** dev, iio_context* ctx) {
-    switch (d) {
-        case TX:
-            *dev = iio_context_find_device(ctx, "cf-ad9361-dds-core-lpc");
-            return *dev != NULL;
-        case RX:
-            *dev = iio_context_find_device(ctx, "cf-ad9361-lpc");
-            return *dev != NULL;
-        default:
-            IIO_ENSURE(0);
-            return false;
-    }
-}
-
-static void shutdown(void) {
-    printf("* Destroying streams\n");
-    // TODO: make sure to clean up.
-    exit(0);
-}
-static void errchk(int v, const char* what) {
-    if (v < 0) {
-        fprintf(stderr, "Error %d writing to channel \"%s\"\nvalue may not be supported.\n", v, what);
-        shutdown();
-    }
+static char tmpstr[64];
+static char* get_ch_name(const char* type, int id) {
+    snprintf(tmpstr, sizeof(tmpstr), "%s%d", type, id);
+    return tmpstr;
 }
 
 static bool get_ad9361_stream_ch(enum iodev d, struct iio_device* dev, int chid, struct iio_channel** chn) {
@@ -79,6 +69,45 @@ static bool get_ad9361_stream_ch(enum iodev d, struct iio_device* dev, int chid,
     if (!*chn)
         *chn = iio_device_find_channel(dev, get_ch_name("altvoltage", chid), d == TX);
     return *chn != NULL;
+}
+
+void DummyStream::rx_channel_enable() {
+    bool success;
+    success = get_ad9361_stream_ch(RX, device, 0, &rx_ch_i);
+    if (!success) {
+        throw std::runtime_error("unable to get I channel");
+    }
+    success = get_ad9361_stream_ch(RX, device, 1, &rx_ch_q);
+    if (!success) {
+        throw std::runtime_error("unable to get Q channel");
+    }
+    iio_channel_enable(rx_ch_i, rx_mask);
+    iio_channel_enable(rx_ch_q, rx_mask);
+}
+ssize_t DummyStream::get_rx_sample_size() {
+    return iio_device_get_sample_size(device, rx_mask);
+}
+DummyStream::DummyStream(iio_device* dev) {
+    device = dev;
+    if (!device) {
+        throw std::runtime_error("No device");
+    }
+
+    rx_mask = iio_create_channels_mask(iio_device_get_channels_count(device));
+    rx_channel_enable();
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "channel_count %d", iio_device_get_channels_count(device));
+    if (!rx_mask) {
+        throw std::runtime_error("No rx_mask");
+    }
+    rx_buffer = iio_device_create_buffer(device, 0, rx_mask);
+    if (iio_err(rx_buffer) != 0) {
+        dev_perror(device, iio_err(rx_buffer), "Could not create RX buffer");
+        throw std::runtime_error("No rx_buffer");
+    }
+    rx_stream = iio_buffer_create_stream(rx_buffer, 4, BLOCK_SIZE);
+    if (iio_err(rx_stream) != 0) {
+        throw std::runtime_error("No rx_stream");
+    }
 }
 
 /***********************************************************************
@@ -108,10 +137,10 @@ class MyDevice : public SoapySDR::Device {
     void setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args = SoapySDR::Kwargs());
     void setBandwidth(const int direction, const size_t channel, const double bw);
     void setSampleRate(const int direction, const size_t channel, const double rate);
-    MyDevice(void);
+    MyDevice(int i);
 
    private:
-    AD9361 device;
+    AD9361* device;
 };
 std::string MyDevice::getDriverKey(void) const {
     return "driver_key";
@@ -138,7 +167,7 @@ bool MyDevice::getFullDuplex(const int direction, const size_t channel) const {
 }
 
 SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& format, const std::vector<size_t>& channels, const SoapySDR::Kwargs& args) {
-    // SoapySDR::setLogLevel(SOAPY_SDR_DEBUG);
+    (void)args;
     if (direction != SOAPY_SDR_RX)
         throw std::runtime_error("Only RX direction is supported");
     if (format != SOAPY_SDR_CS16)
@@ -147,44 +176,11 @@ SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& 
     if (chans.size() > 1) {
         throw std::runtime_error("currently only one channel is supported");
     }
-    DummyStream* stream = new DummyStream;
+
+    DummyStream* stream = new DummyStream(device->device_input);
     stream->direction = direction;
-    stream->format = format;
     stream->channels = chans;
 
-    int err;
-    stream->ctx = iio_create_context(NULL, "ip:192.168.88.194");
-    err = iio_err(stream->ctx);
-    IIO_ENSURE(!err && "No context");
-    IIO_ENSURE(iio_context_get_devices_count(stream->ctx) > 0 && "No devices");
-    IIO_ENSURE(get_ad9361_stream_dev(RX, &stream->rx, stream->ctx) && "No tx dev found");
-
-    IIO_ENSURE(get_ad9361_stream_ch(RX, stream->rx, 0, &stream->rx_ch_i) && "RX chan i not found");
-    IIO_ENSURE(get_ad9361_stream_ch(RX, stream->rx, 1, &stream->rx_ch_q) && "RX chan q not found");
-
-    stream->rx_mask = iio_create_channels_mask(iio_device_get_channels_count(stream->rx));
-    if (!stream->rx_mask) {
-        fprintf(stderr, "Unable to alloc channels mask\n");
-        shutdown();
-    }
-    printf("* Enabling IIO streaming channels\n");
-    iio_channel_enable(stream->rx_ch_i, stream->rx_mask);
-    iio_channel_enable(stream->rx_ch_q, stream->rx_mask);
-
-    stream->rx_buffer = iio_device_create_buffer(stream->rx, 0, stream->rx_mask);
-    err = iio_err(stream->rx_buffer);
-    if (err) {
-        stream->rx_buffer = NULL;
-        dev_perror(stream->rx, err, "Could not create RX buffer");
-        shutdown();
-    }
-    stream->rx_stream = iio_buffer_create_stream(stream->rx_buffer, 4, BLOCK_SIZE);
-    err = iio_err(stream->rx_stream);
-    if (err) {
-        stream->rx_stream = NULL;
-        dev_perror(stream->rx, iio_err(stream->rx_stream), "Could not create RX stream");
-        shutdown();
-    }
     SoapySDR_logf(SOAPY_SDR_DEBUG, "setupStream done ");
     return reinterpret_cast<SoapySDR::Stream*>(stream);
 }
@@ -215,7 +211,7 @@ std::string MyDevice::getNativeStreamFormat(const int direction, const size_t ch
 }
 
 int MyDevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const size_t numElems, int& flags, long long& timeNs, const long timeoutUs) {
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "readStream ");
+    SoapySDR_logf(SOAPY_SDR_TRACE, "readStream ");
     DummyStream* s = reinterpret_cast<DummyStream*>(stream);
     if (!s->active) {
         if (timeoutUs > 0) {
@@ -223,31 +219,17 @@ int MyDevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const siz
         }
         return SOAPY_SDR_TIMEOUT;
     }
-    int err;
     size_t output_counter = 0;
     int16_t* buffer = reinterpret_cast<int16_t*>(buffs[0]);
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "before while");
+    SoapySDR_logf(SOAPY_SDR_TRACE, "before while");
     while (output_counter < numElems) {
-        int16_t* p_start;
-        ptrdiff_t p_inc;
-
         if (s->current_buffer_finished) {
-            const iio_block* rxblock = iio_stream_get_next_block(s->rx_stream);
-            err = iio_err(rxblock);
-            if (err) {
-                ctx_perror(s->ctx, err, "Unable to receive block");
-                throw std::runtime_error("unable to receive block");
-            }
-            s->p_end = reinterpret_cast<int16_t*>(iio_block_end(rxblock));
-            p_start = reinterpret_cast<int16_t*>(iio_block_first(rxblock, s->rx_ch_i));
-            s->current_buffer_finished = false;
-        } else {
-            p_start = s->p_dat;
+            s->prepare_next_block();
         }
-        size_t rx_sample = iio_device_get_sample_size(s->rx, s->rx_mask);
+        size_t rx_sample = s->get_rx_sample_size();
 
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "before for");
-        for (s->p_dat = p_start; s->p_dat < s->p_end; s->p_dat += rx_sample / sizeof(*s->p_dat)) {
+        SoapySDR_logf(SOAPY_SDR_TRACE, "before for");
+        for (s->p_dat; s->p_dat < s->p_end; s->p_dat += rx_sample / sizeof(*s->p_dat)) {
             int16_t i = s->p_dat[0];
             int16_t q = s->p_dat[1];
 
@@ -258,16 +240,13 @@ int MyDevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const siz
             output_counter++;
 
             if (output_counter >= numElems) {
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "early return");
+                SoapySDR_logf(SOAPY_SDR_TRACE, "early return");
                 return static_cast<int>(numElems);
             }
-
-            // *buffer++ = static_cast<int16_t>(i); TODO: check this version
-            // *buffer++ = static_cast<int16_t>(q);
         }
         s->current_buffer_finished = true;
     }
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "after while");
+    SoapySDR_logf(SOAPY_SDR_TRACE, "after while");
     return static_cast<int>(numElems);
 }
 
@@ -303,9 +282,11 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
 
 SoapySDR::Device* makeMyDevice(const SoapySDR::Kwargs& args) {
     (void)args;
+    SoapySDR::setLogLevel(SOAPY_SDR_DEBUG);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "makeMyDevice ");
     // create an instance of the device object given the args
     // here we will translate args into something used in the constructor
-    return new MyDevice();
+    return new MyDevice(1);
 }
 
 /***********************************************************************
@@ -350,18 +331,20 @@ void MyDevice::setFrequency(const int direction, const size_t channel, const dou
     (void)frequency;
     (void)args;
     SoapySDR_logf(SOAPY_SDR_WARNING, "setFrequency %d", direction);
-    device.set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
+    device->set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
 }
 
 void MyDevice::setBandwidth(const int direction, const size_t channel, const double bw) {
-    device.set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
+    device->set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
 }
 
 void MyDevice::setSampleRate(const int direction, const size_t channel, const double rate) {
-    device.set_sample_rate(static_cast<long long>(rate), direction == SOAPY_SDR_TX);
+    device->set_sample_rate(static_cast<long long>(rate), direction == SOAPY_SDR_TX);
 }
 
-MyDevice::MyDevice(void) : device("ip:192.168.88.194") {
+MyDevice::MyDevice(int i) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor %d", i);
+    device = new AD9361("ip:192.168.88.194");
 }
 
 int MyDevice::deactivateStream(SoapySDR::Stream* stream, const int, const long long) {

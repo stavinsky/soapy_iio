@@ -1,5 +1,7 @@
 #include "ad9361.hpp"
 
+#include <SoapySDR/Logger.hpp>
+
 int AD9361::set_frequency(long long freq, bool output = false) {
     if (output == true) {
         return set_channel_param(lo_channel_output, "frequency", freq);
@@ -22,6 +24,7 @@ int AD9361::set_sample_rate(long long freq, bool output = false) {
 }
 
 AD9361::AD9361(std::string url) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "constructor start");
     ctx = iio_create_context(NULL, url.c_str());
     int error = iio_err(ctx);
     if (error != 0) {
@@ -44,6 +47,13 @@ AD9361::AD9361(std::string url) {
     }
     rf_port_select(phy_channel_input, "A_BALANCED");
     rf_port_select(phy_channel_output, "A_BALANCED");
+
+    device_output = iio_context_find_device(ctx, "cf-ad9361-dds-core-lpc");
+    device_input = iio_context_find_device(ctx, "cf-ad9361-lpc");
+    if (!device_input) {
+        throw std::runtime_error("No device_input");
+    }
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "constructor end");
 }
 
 int AD9361::set_channel_param(iio_channel* channel, const char* key, long long value) {

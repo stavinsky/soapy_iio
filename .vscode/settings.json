@@ -58,7 +58,9 @@
     "tuple": "cpp",
     "type_traits": "cpp",
     "utility": "cpp",
-    "ostream": "cpp"
+    "ostream": "cpp",
+    "__config": "cpp",
+    "iostream": "cpp"
   },
   "editor.formatOnSave": true,
   "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 0}",
