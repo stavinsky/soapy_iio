@@ -28,6 +28,6 @@ endif ()
 include_directories(${MY_DEVICE_INCLUDE_DIRS})
 SOAPY_SDR_MODULE_UTIL(
     TARGET MyDevice
-    SOURCES MyDeviceSupport.cpp
+    SOURCES MyDeviceSupport.cpp ad9361.cpp
     LIBRARIES ${LIBIIO_LIBRARIES}
 )

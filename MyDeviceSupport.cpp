@@ -2,7 +2,7 @@ extern "C" {
 #include <iio/iio-debug.h>
 }
 
-#include <iio/iio.h>
+// #include <iio/iio.h>
 
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Formats.hpp>
@@ -13,9 +13,10 @@ extern "C" {
 #include <string>
 #include <thread>
 
+#include "ad9361.hpp"
+
 #define BLOCK_SIZE (32000 * 4)  // TODO: make parameter
-#define MHZ(x) ((long long)(x * 1000000.0 + .5))
-#define GHZ(x) ((long long)(x * 1000000000.0 + .5))
+
 #define IIO_ENSURE(expr)                                                             \
     {                                                                                \
         if (!(expr)) {                                                               \
@@ -23,24 +24,17 @@ extern "C" {
             (void)abort();                                                           \
         }                                                                            \
     }
-
-enum iodev { RX,
-             TX };
-
-struct stream_cfg {
-    long long bw_hz;     // Analog banwidth in Hz
-    long long fs_hz;     // Baseband sample rate in Hz
-    long long lo_hz;     // Local oscillator frequency in Hz
-    const char* rfport;  // Port name
-};
-
+static char* get_ch_name(const char* type, int id) {
+    static char tmpstr[64];
+    snprintf(tmpstr, sizeof(tmpstr), "%s%d", type, id);
+    return tmpstr;
+}
 struct DummyStream {
     int direction;
     std::string format;
     std::vector<size_t> channels;
     struct iio_device* rx;
     size_t rx_sample_sz;
-    struct stream_cfg rxcfg;
     struct iio_context* ctx;
     struct iio_channel* rx_ch_i;
     struct iio_channel* rx_ch_q;
@@ -67,30 +61,7 @@ static bool get_ad9361_stream_dev(enum iodev d, struct iio_device** dev, iio_con
             return false;
     }
 }
-static struct iio_device* get_ad9361_phy(iio_context* ctx) {
-    struct iio_device* dev = iio_context_find_device(ctx, "ad9361-phy");
-    IIO_ENSURE(dev && "No ad9361-phy found");
-    return dev;
-}
-static char* get_ch_name(const char* type, int id) {
-    static char tmpstr[64];
-    snprintf(tmpstr, sizeof(tmpstr), "%s%d", type, id);
-    return tmpstr;
-}
 
-static bool get_phy_chan(enum iodev d, int chid, struct iio_channel** chn, iio_context* ctx) {
-    switch (d) {
-        case RX:
-            *chn = iio_device_find_channel(get_ad9361_phy(ctx), get_ch_name("voltage", chid), false);
-            return *chn != NULL;
-        case TX:
-            *chn = iio_device_find_channel(get_ad9361_phy(ctx), get_ch_name("voltage", chid), true);
-            return *chn != NULL;
-        default:
-            IIO_ENSURE(0);
-            return false;
-    }
-}
 static void shutdown(void) {
     printf("* Destroying streams\n");
     // TODO: make sure to clean up.
@@ -103,50 +74,6 @@ static void errchk(int v, const char* what) {
     }
 }
 
-static void wr_ch_lli(struct iio_channel* chn, const char* what, long long val) {
-    const struct iio_attr* attr = iio_channel_find_attr(chn, what);
-
-    errchk(attr ? iio_attr_write_longlong(attr, val) : -ENOENT, what);
-}
-/* finds AD9361 local oscillator IIO configuration channels */
-static bool get_lo_chan(enum iodev d, struct iio_channel** chn, iio_context* ctx) {
-    switch (d) {
-            // LO chan is always output, i.e. true
-        case RX:
-            *chn = iio_device_find_channel(get_ad9361_phy(ctx), get_ch_name("altvoltage", 0), true);
-            return *chn != NULL;
-        case TX:
-            *chn = iio_device_find_channel(get_ad9361_phy(ctx), get_ch_name("altvoltage", 1), true);
-            return *chn != NULL;
-        default:
-            IIO_ENSURE(0);
-            return false;
-    }
-}
-bool cfg_ad9361_streaming_ch(struct stream_cfg* cfg, enum iodev type, int chid, iio_context* ctx) {
-    const struct iio_attr* attr;
-    struct iio_channel* chn = NULL;
-
-    // Configure phy and lo channels
-    printf("* Acquiring AD9361 phy channel %d\n", chid);
-    if (!get_phy_chan(type, chid, &chn, ctx)) {
-        return false;
-    }
-
-    attr = iio_channel_find_attr(chn, "rf_port_select");
-    if (attr)
-        errchk(iio_attr_write_string(attr, cfg->rfport), cfg->rfport);
-    wr_ch_lli(chn, "rf_bandwidth", cfg->bw_hz);
-    wr_ch_lli(chn, "sampling_frequency", cfg->fs_hz);
-
-    // Configure LO channel
-    printf("* Acquiring AD9361 %s lo channel\n", type == TX ? "TX" : "RX");
-    if (!get_lo_chan(type, &chn, ctx)) {
-        return false;
-    }
-    wr_ch_lli(chn, "frequency", cfg->lo_hz);
-    return true;
-}
 static bool get_ad9361_stream_ch(enum iodev d, struct iio_device* dev, int chid, struct iio_channel** chn) {
     *chn = iio_device_find_channel(dev, get_ch_name("voltage", chid), d == TX);
     if (!*chn)
@@ -159,6 +86,7 @@ static bool get_ad9361_stream_ch(enum iodev d, struct iio_device* dev, int chid,
  **********************************************************************/
 using namespace std;
 class MyDevice : public SoapySDR::Device {
+   public:
     std::string getDriverKey(void) const;
     std::string getHardwareKey(void) const;
     size_t getNumChannels(const int direction) const;
@@ -177,10 +105,13 @@ class MyDevice : public SoapySDR::Device {
     SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel, const std::string& name) const;
     int deactivateStream(SoapySDR::Stream* stream, const int, const long long);
     int activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t);
+    void setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args = SoapySDR::Kwargs());
+    void setBandwidth(const int direction, const size_t channel, const double bw);
+    void setSampleRate(const int direction, const size_t channel, const double rate);
+    MyDevice(void);
 
-    // Implement constructor with device specific arguments...
-
-    // Implement all applicable virtual methods from SoapySDR::Device
+   private:
+    AD9361 device;
 };
 std::string MyDevice::getDriverKey(void) const {
     return "driver_key";
@@ -220,10 +151,6 @@ SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& 
     stream->direction = direction;
     stream->format = format;
     stream->channels = chans;
-    stream->rxcfg.bw_hz = MHZ(20);        // 2 MHz rf bandwidth
-    stream->rxcfg.fs_hz = MHZ(4.4);       // 2.5 MS/s rx sample rate
-    stream->rxcfg.lo_hz = MHZ(103.2);     // 2.5 GHz rf frequency
-    stream->rxcfg.rfport = "A_BALANCED";  // port A (select for rf freq.)
 
     int err;
     stream->ctx = iio_create_context(NULL, "ip:192.168.88.194");
@@ -231,7 +158,6 @@ SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& 
     IIO_ENSURE(!err && "No context");
     IIO_ENSURE(iio_context_get_devices_count(stream->ctx) > 0 && "No devices");
     IIO_ENSURE(get_ad9361_stream_dev(RX, &stream->rx, stream->ctx) && "No tx dev found");
-    IIO_ENSURE(cfg_ad9361_streaming_ch(&stream->rxcfg, RX, 0, stream->ctx) && "RX port 0 not found");
 
     IIO_ENSURE(get_ad9361_stream_ch(RX, stream->rx, 0, &stream->rx_ch_i) && "RX chan i not found");
     IIO_ENSURE(get_ad9361_stream_ch(RX, stream->rx, 1, &stream->rx_ch_q) && "RX chan q not found");
@@ -265,7 +191,8 @@ SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& 
 
 void MyDevice::closeStream(SoapySDR::Stream* stream) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "close stream  ");
-    delete reinterpret_cast<DummyStream*>(stream);
+    DummyStream* s = reinterpret_cast<DummyStream*>(stream);
+    delete s;
 }
 
 std::vector<std::string> MyDevice::getStreamFormats(const int direction, const size_t channel) const {
@@ -416,6 +343,25 @@ int MyDevice::activateStream(SoapySDR::Stream* stream, const int, const long lon
     auto* s = reinterpret_cast<DummyStream*>(stream);
     s->active = true;
     return 0;
+}
+
+void MyDevice::setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args) {
+    (void)channel;
+    (void)frequency;
+    (void)args;
+    SoapySDR_logf(SOAPY_SDR_WARNING, "setFrequency %d", direction);
+    device.set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
+}
+
+void MyDevice::setBandwidth(const int direction, const size_t channel, const double bw) {
+    device.set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
+}
+
+void MyDevice::setSampleRate(const int direction, const size_t channel, const double rate) {
+    device.set_sample_rate(static_cast<long long>(rate), direction == SOAPY_SDR_TX);
+}
+
+MyDevice::MyDevice(void) : device("ip:192.168.88.194") {
 }
 
 int MyDevice::deactivateStream(SoapySDR::Stream* stream, const int, const long long) {
