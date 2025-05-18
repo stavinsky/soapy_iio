@@ -15,6 +15,41 @@ int AD9361::set_bandwidth_frequency(long long freq, bool output = false) {
     }
     return set_channel_param(phy_channel_input, "rf_bandwidth", freq);
 }
+double AD9361::get_sample_rate(bool output) {
+    if (output == true) {
+        return get_channel_param(phy_channel_output, "sampling_frequency");
+    }
+    return get_channel_param(phy_channel_input, "sampling_frequency");
+}
+
+double AD9361::get_frequency(bool output) {
+    if (output == true) {
+        return get_channel_param(lo_channel_output, "frequency");
+    }
+    return get_channel_param(lo_channel_input, "frequency");
+}
+
+int AD9361::set_gain(double value, bool output) {
+    // if (output == true) {
+    //     return set_channel_param_double(phy_channel_output, "hardwaregain", value);
+    // }
+    // return set_channel_param_double(phy_channel_output, "hardwaregain", value);
+    try {
+        iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+        const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
+        iio_attr_write_double(attr, value);
+        // char buf[64];
+        // iio_attr_read_raw(attr, buf, sizeof(buf));
+
+        // SoapySDR_logf(SOAPY_SDR_DEBUG, "hardwaregain now: %s", buf);
+        // double actual_gain;
+        // iio_attr_read_double(attr, &actual_gain);
+        // SoapySDR_logf(SOAPY_SDR_DEBUG, "hardwaregain now: %f", actual_gain);
+        // SoapySDR_logf(SOAPY_SDR_DEBUG, "hardwaregain desired: %f", value);
+    } catch (...) {
+    }
+    return 0;
+}
 
 int AD9361::set_sample_rate(long long freq, bool output = false) {
     if (output == true) {
@@ -56,9 +91,25 @@ AD9361::AD9361(std::string url) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "constructor end");
 }
 
+AD9361::~AD9361() {
+    if (ctx) {
+        iio_context_destroy(ctx);
+    }
+}
+
 int AD9361::set_channel_param(iio_channel* channel, const char* key, long long value) {
     const struct iio_attr* attr = iio_channel_find_attr(channel, key);
     return iio_attr_write_longlong(attr, value);
+}
+int AD9361::set_channel_param_double(iio_channel* channel, const char* key, double value) {
+    const struct iio_attr* attr = iio_channel_find_attr(channel, key);
+    return iio_attr_write_double(attr, value);
+}
+long long AD9361::get_channel_param(iio_channel* channel, const char* key) {
+    const struct iio_attr* attr = iio_channel_find_attr(channel, key);
+    long long val;
+    iio_attr_read_longlong(attr, &val);
+    return val;
 }
 
 int AD9361::rf_port_select(iio_channel* channel, std::string rf_port) {
