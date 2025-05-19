@@ -26,6 +26,7 @@ class AD9361 {
     int set_gain(double value, bool output);
     void set_gain_mode(bool output, bool automatic);
     bool get_gain_mode(bool output);
+    double get_gain(bool output);
 
     // ssize_t get_rx_sample_size();
     // ssize_t get_tx_sample_size();

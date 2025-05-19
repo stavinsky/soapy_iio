@@ -30,6 +30,7 @@ double AD9361::get_frequency(bool output) {
 }
 
 int AD9361::set_gain(double value, bool output) {
+    (void)output;  // TODO:
     try {
         iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
         const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
@@ -42,7 +43,7 @@ int AD9361::set_gain(double value, bool output) {
 
 void AD9361::set_gain_mode(bool output, bool automatic) {
     if (output == true) {
-        return;  // TODO
+        return;  // TODO:
     }
     iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
     const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
@@ -50,6 +51,7 @@ void AD9361::set_gain_mode(bool output, bool automatic) {
 }
 
 bool AD9361::get_gain_mode(bool output) {
+    (void)output;  // TODO:
     iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
     const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
     char buf[64];
@@ -57,6 +59,15 @@ bool AD9361::get_gain_mode(bool output) {
     std::string mode(buf);
     SoapySDR_logf(SOAPY_SDR_DEBUG, "current gain mode is %s ", buf);
     return mode != "manual";
+}
+
+double AD9361::get_gain(bool output) {
+    (void)output;  // TODO:
+    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
+    double value;
+    iio_attr_read_double(attr, &value);
+    return value;
 }
 
 int AD9361::set_sample_rate(long long freq, bool output = false) {
