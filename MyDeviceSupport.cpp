@@ -1,7 +1,7 @@
 
-extern "C" {
-#include <iio/iio-debug.h>
-}
+// extern "C" {
+// #include <iio/iio-debug.h>
+// }
 // #include <iio/iio.h>
 
 #include <SoapySDR/Device.hpp>
@@ -102,7 +102,6 @@ DummyStream::DummyStream(iio_device* dev) {
     }
     rx_buffer = iio_device_create_buffer(device, 0, rx_mask);
     if (iio_err(rx_buffer) != 0) {
-        dev_perror(device, iio_err(rx_buffer), "Could not create RX buffer");
         throw std::runtime_error("No rx_buffer");
     }
     rx_stream = iio_buffer_create_stream(rx_buffer, 4, BLOCK_SIZE);
