@@ -143,11 +143,9 @@ class MyDevice : public SoapySDR::Device {
     double getSampleRate(const int direction, const size_t channel) const;
     SoapySDR::RangeList getSampleRateRange(const int direction, const size_t channel) const;
     std::vector<double> listSampleRates(const int direction, const size_t channel) const;
-    void setGain(const int direction, const size_t channel, const double value);
-    void setGain(const int direction, const size_t channel, const std::string& name, const double value);
+
     std::vector<std::string> listFrequencies(const int direction, const size_t channel) const;
-    SoapySDR::Range getGainRange(const int direction, const size_t channel) const;
-    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string& name) const;
+
     SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel, const std::string& name) const;
     int deactivateStream(SoapySDR::Stream* stream, const int, const long long);
     int activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t);
@@ -156,6 +154,13 @@ class MyDevice : public SoapySDR::Device {
     void setBandwidth(const int direction, const size_t channel, const double bw);
     void setSampleRate(const int direction, const size_t channel, const double rate);
     double getFrequency(const int direction, const size_t channel) const;
+    void setGainMode(const int direction, const size_t channel, const bool automatic);
+    bool hasGainMode(const int direction, const size_t channel) const;
+    bool getGainMode(const int direction, const size_t channel) const;
+    SoapySDR::Range getGainRange(const int direction, const size_t channel) const;
+    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string& name) const;
+    void setGain(const int direction, const size_t channel, const double value);
+    void setGain(const int direction, const size_t channel, const std::string& name, const double value);
     MyDevice(int i);
     ~MyDevice();
 
@@ -330,7 +335,29 @@ void MyDevice::setGain(const int direction, const size_t channel, const std::str
     SoapySDR_logf(SOAPY_SDR_DEBUG, "setGain");
     device->set_gain(value, direction == SOAPY_SDR_TX);
 }
+SoapySDR::Range MyDevice::getGainRange(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange");
+    return SoapySDR::Range(-20, 90);
+}
 
+SoapySDR::Range MyDevice::getGainRange(const int direction, const size_t channel, const std::string& name) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange2");
+    return SoapySDR::Range(-20, 90);
+}
+void MyDevice::setGainMode(const int direction, const size_t channel, const bool automatic) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "setGainMode ");
+    device->set_gain_mode(direction == SOAPY_SDR_TX, automatic);
+}
+
+bool MyDevice::hasGainMode(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "hasGainMode ");
+    return true;
+}
+
+bool MyDevice::getGainMode(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainMode ");
+    return device->get_gain_mode(direction == SOAPY_SDR_TX);
+}
 SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
     std::vector<SoapySDR::Kwargs> results;
     SoapySDR_logf(SOAPY_SDR_DEBUG, "findMyDevice");
@@ -357,16 +384,6 @@ SoapySDR::Device* makeMyDevice(const SoapySDR::Kwargs& args) {
  * Registration
  **********************************************************************/
 static SoapySDR::Registry registerMyDevice("my_device", &findMyDevice, &makeMyDevice, SOAPY_SDR_ABI_VERSION);
-
-SoapySDR::Range MyDevice::getGainRange(const int direction, const size_t channel) const {
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange");
-    return SoapySDR::Range(-20, 90);
-}
-
-SoapySDR::Range MyDevice::getGainRange(const int direction, const size_t channel, const std::string& name) const {
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange2");
-    return SoapySDR::Range(-20, 90);
-}
 
 SoapySDR::RangeList MyDevice::getFrequencyRange(const int direction, const size_t channel, const std::string& name) const {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getFrequencyRange");
@@ -419,6 +436,8 @@ double MyDevice::getFrequency(const int direction, const size_t channel) const {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getFrequency ");
     return device->get_frequency(direction == SOAPY_SDR_TX);
 }
+
+
 
 MyDevice::MyDevice(int i) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor %d", i);

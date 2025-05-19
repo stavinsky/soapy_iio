@@ -30,25 +30,33 @@ double AD9361::get_frequency(bool output) {
 }
 
 int AD9361::set_gain(double value, bool output) {
-    // if (output == true) {
-    //     return set_channel_param_double(phy_channel_output, "hardwaregain", value);
-    // }
-    // return set_channel_param_double(phy_channel_output, "hardwaregain", value);
     try {
         iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
         const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
         iio_attr_write_double(attr, value);
-        // char buf[64];
-        // iio_attr_read_raw(attr, buf, sizeof(buf));
 
-        // SoapySDR_logf(SOAPY_SDR_DEBUG, "hardwaregain now: %s", buf);
-        // double actual_gain;
-        // iio_attr_read_double(attr, &actual_gain);
-        // SoapySDR_logf(SOAPY_SDR_DEBUG, "hardwaregain now: %f", actual_gain);
-        // SoapySDR_logf(SOAPY_SDR_DEBUG, "hardwaregain desired: %f", value);
     } catch (...) {
     }
     return 0;
+}
+
+void AD9361::set_gain_mode(bool output, bool automatic) {
+    if (output == true) {
+        return;  // TODO
+    }
+    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
+    iio_attr_write_string(attr, automatic ? "slow_attack" : "manual");
+}
+
+bool AD9361::get_gain_mode(bool output) {
+    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
+    char buf[64];
+    iio_attr_read_raw(attr, buf, sizeof(buf));
+    std::string mode(buf);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "current gain mode is %s ", buf);
+    return mode != "manual";
 }
 
 int AD9361::set_sample_rate(long long freq, bool output = false) {
