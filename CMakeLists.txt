@@ -31,10 +31,13 @@ SOAPY_SDR_MODULE_UTIL(
     SOURCES MyDeviceSupport.cpp ad9361.cpp
     LIBRARIES ${LIBIIO_LIBRARIES}
 )
-install(CODE "
-    execute_process(COMMAND install_name_tool
-        -change @rpath/libiio.1.dylib
-                ${LIBIIO_LIBRARY_DIRS}/libiio.dylib
-                \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/lib/SoapySDR/modules0.8/libMyDevice.so
-    )
-")
+if(APPLE)
+    install(CODE "
+        execute_process(COMMAND install_name_tool
+            -change @rpath/libiio.1.dylib
+                    ${LIBIIO_LIBRARY_DIRS}/libiio.dylib
+                    \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/lib/SoapySDR/modules0.8/libMyDevice.so
+        )
+    ")
+
+endif()
