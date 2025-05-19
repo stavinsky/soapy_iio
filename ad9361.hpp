@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iio/iio.h>
+#include <iio.h>
 
 #include <string>
 #define MHZ(x) ((long long)(x * 1000000.0 + .5))

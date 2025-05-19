@@ -13,19 +13,20 @@ find_package(SoapySDR CONFIG)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBIIO REQUIRED libiio)
 
-include_directories(${LIBIIO_INCLUDE_DIRS})
+
+
+
+
+# set(MY_INCLUDE_DIRS ${MY_DEVICE_INCLUDE_DIRS})
+
+    foreach(dir ${LIBIIO_INCLUDE_DIRS})
+        list(APPEND MY_INCLUDE_DIRS "${dir}/iio")
+    endforeach()
+
 link_directories(${LIBIIO_LIBRARY_DIRS})
+include_directories(${LIBIIO_INCLUDE_DIRS} )
+include_directories(${MY_INCLUDE_DIRS} )
 
-if (NOT SoapySDR_FOUND)
-    message(WARNING "SoapySDR development files not found - skipping support")
-    return()
-endif ()
-
-if (NOT LIBIIO_FOUND)
-    message(WARNING "LIBIIO development files not found - skipping support")
-    return()
-endif ()
-include_directories(${MY_DEVICE_INCLUDE_DIRS})
 SOAPY_SDR_MODULE_UTIL(
     TARGET MyDevice
     SOURCES MyDeviceSupport.cpp ad9361.cpp
@@ -41,3 +42,4 @@ if(APPLE)
     ")
 
 endif()
+message(STATUS "MY_INCLUDE_DIRS: ${MY_INCLUDE_DIRS}")
