@@ -131,7 +131,8 @@ long long AD9361::get_channel_param(iio_channel* channel, const char* key) {
     return val;
 }
 
-int AD9361::rf_port_select(iio_channel* channel, std::string rf_port) {
+ssize_t AD9361::rf_port_select(iio_channel* channel, std::string rf_port) {
     const struct iio_attr* attr = iio_channel_find_attr(channel, "rf_port_select");
+
     return iio_attr_write_string(attr, rf_port.c_str());
 }
