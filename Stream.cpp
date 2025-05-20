@@ -20,7 +20,7 @@ static bool get_ad9361_stream_ch(enum iodev d, struct iio_device* dev, int chid,
     return *chn != NULL;
 }
 
-void DummyStream::rx_channel_enable() {
+void Stream::rx_channel_enable() {
     bool success;
     success = get_ad9361_stream_ch(RX, device, 0, &rx_ch_i);
     if (!success) {
@@ -33,11 +33,11 @@ void DummyStream::rx_channel_enable() {
     iio_channel_enable(rx_ch_i, rx_mask);
     iio_channel_enable(rx_ch_q, rx_mask);
 }
-size_t DummyStream::get_rx_sample_size() {
+size_t Stream::get_rx_sample_size() {
     ssize_t sample_rate = iio_device_get_sample_size(device, rx_mask);
     return static_cast<size_t>(sample_rate);
 }
-DummyStream::DummyStream(iio_device* dev) {
+Stream::Stream(iio_device* dev) {
     device = dev;
     if (!device) {
         throw std::runtime_error("No device");
@@ -59,7 +59,7 @@ DummyStream::DummyStream(iio_device* dev) {
     }
 }
 
-DummyStream::~DummyStream() {
+Stream::~Stream() {
     if (rx_stream) {
         iio_stream_destroy(rx_stream);
     }
@@ -73,7 +73,7 @@ DummyStream::~DummyStream() {
     exit(0);
 }
 
-void DummyStream::prepare_next_block() {
+void Stream::prepare_next_block() {
     rx_block = iio_stream_get_next_block(rx_stream);
     int err = iio_err(rx_block);
     if (err) {

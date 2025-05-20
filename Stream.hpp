@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-class DummyStream {
+class Stream {
    public:
     int direction;
     std::string format;
@@ -24,7 +24,7 @@ class DummyStream {
 
     void rx_channel_enable();
     size_t get_rx_sample_size();
-    DummyStream(iio_device* device);
-    ~DummyStream();
+    Stream(iio_device* device);
+    ~Stream();
     void prepare_next_block();
 };

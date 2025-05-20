@@ -8,14 +8,14 @@
 #define MHZ(x) (x * 1000000.0)
 #define GHZ(x) (x * 1000000000.0)
 
-std::string MyDevice::getDriverKey(void) const {
+std::string IIODevice::getDriverKey(void) const {
     return "IIODevice";
 }
-std::string MyDevice::getHardwareKey(void) const {
+std::string IIODevice::getHardwareKey(void) const {
     return "fmcomms3";
 }
 
-size_t MyDevice::getNumChannels(const int direction) const {
+size_t IIODevice::getNumChannels(const int direction) const {
     // if (direction == SOAPY_SDR_TX) {
     //     return 2;
     // }
@@ -26,13 +26,13 @@ size_t MyDevice::getNumChannels(const int direction) const {
     return 0;
 }
 
-bool MyDevice::getFullDuplex(const int direction, const size_t channel) const {
+bool IIODevice::getFullDuplex(const int direction, const size_t channel) const {
     (void)direction;
     (void)channel;
     return true;
 }
 
-SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& format, const std::vector<size_t>& channels, const SoapySDR::Kwargs& args) {
+SoapySDR::Stream* IIODevice::setupStream(const int direction, const std::string& format, const std::vector<size_t>& channels, const SoapySDR::Kwargs& args) {
     (void)args;
     if (direction != SOAPY_SDR_RX)
         throw std::runtime_error("Only RX direction is supported");
@@ -43,7 +43,7 @@ SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& 
         throw std::runtime_error("currently only one channel is supported");
     }
 
-    DummyStream* stream = new DummyStream(device->device_input);
+    Stream* stream = new Stream(device->device_input);
     stream->direction = direction;
     stream->channels = chans;
     stream->format = format;
@@ -54,13 +54,13 @@ SoapySDR::Stream* MyDevice::setupStream(const int direction, const std::string& 
     return reinterpret_cast<SoapySDR::Stream*>(stream);
 }
 
-void MyDevice::closeStream(SoapySDR::Stream* stream) {
+void IIODevice::closeStream(SoapySDR::Stream* stream) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "close stream  ");
-    DummyStream* s = reinterpret_cast<DummyStream*>(stream);
+    Stream* s = reinterpret_cast<Stream*>(stream);
     delete s;
 }
 
-std::vector<std::string> MyDevice::getStreamFormats(const int direction, const size_t channel) const {
+std::vector<std::string> IIODevice::getStreamFormats(const int direction, const size_t channel) const {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getStreamFormats ");
     (void)direction;
     (void)channel;
@@ -72,7 +72,7 @@ std::vector<std::string> MyDevice::getStreamFormats(const int direction, const s
     return formats;
 }
 
-std::string MyDevice::getNativeStreamFormat(const int direction, const size_t channel, double& fullScale) const {
+std::string IIODevice::getNativeStreamFormat(const int direction, const size_t channel, double& fullScale) const {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getNativeFormat ");
     (void)direction;
     (void)channel;
@@ -80,12 +80,12 @@ std::string MyDevice::getNativeStreamFormat(const int direction, const size_t ch
     return SOAPY_SDR_CS16;
 }
 
-int MyDevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const size_t numElems, int& flags, long long& timeNs, const long timeoutUs) {
+int IIODevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const size_t numElems, int& flags, long long& timeNs, const long timeoutUs) {
     (void)flags;
     (void)timeNs;
 
     SoapySDR_logf(SOAPY_SDR_TRACE, "readStream ");
-    DummyStream* s = reinterpret_cast<DummyStream*>(stream);
+    Stream* s = reinterpret_cast<Stream*>(stream);
     if (!s->active) {
         if (timeoutUs > 0) {
             std::this_thread::sleep_for(std::chrono::microseconds(timeoutUs));
@@ -129,12 +129,12 @@ int MyDevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const siz
     return static_cast<int>(numElems);
 }
 
-double MyDevice::getSampleRate(const int direction, const size_t channel) const {
+double IIODevice::getSampleRate(const int direction, const size_t channel) const {
     (void)channel;
     return device->get_sample_rate(direction == SOAPY_SDR_TX);
 }
 
-SoapySDR::RangeList MyDevice::getSampleRateRange(const int direction, const size_t channel) const {
+SoapySDR::RangeList IIODevice::getSampleRateRange(const int direction, const size_t channel) const {
     (void)direction;
     (void)channel;
     // TODO: show real numbers
@@ -144,7 +144,7 @@ SoapySDR::RangeList MyDevice::getSampleRateRange(const int direction, const size
 
     return ranges;
 }
-std::vector<double> MyDevice::listSampleRates(const int direction, const size_t channel) const {
+std::vector<double> IIODevice::listSampleRates(const int direction, const size_t channel) const {
     (void)direction;
     (void)channel;
 
@@ -163,63 +163,63 @@ std::vector<double> MyDevice::listSampleRates(const int direction, const size_t 
     options.push_back(10e6);
     return (options);
 }
-void MyDevice::setGain(const int direction, const size_t channel, const double value) {
+void IIODevice::setGain(const int direction, const size_t channel, const double value) {
     (void)channel;  // TODO: second channel
     SoapySDR_logf(SOAPY_SDR_DEBUG, "setGain");
     device->set_gain(value, direction == SOAPY_SDR_TX);
 }
 
-void MyDevice::setGain(const int direction, const size_t channel, const std::string& name, const double value) {
+void IIODevice::setGain(const int direction, const size_t channel, const std::string& name, const double value) {
     (void)name;
     (void)channel;  // TODO: second channel
     SoapySDR_logf(SOAPY_SDR_DEBUG, "setGain");
     device->set_gain(value, direction == SOAPY_SDR_TX);
 }
-double MyDevice::getGain(const int direction, const size_t channel) const {
+double IIODevice::getGain(const int direction, const size_t channel) const {
     (void)channel;  // TODO: second channel
     return device->get_gain(direction == SOAPY_SDR_TX);
 }
-double MyDevice::getGain(const int direction, const size_t channel, const std::string& name) const {
+double IIODevice::getGain(const int direction, const size_t channel, const std::string& name) const {
     (void)channel;  // TODO: second channel
     (void)name;
     return device->get_gain(direction == SOAPY_SDR_TX);
 }
-SoapySDR::Range MyDevice::getGainRange(const int direction, const size_t channel) const {
+SoapySDR::Range IIODevice::getGainRange(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange");
     return SoapySDR::Range(-20, 90);
 }
 
-SoapySDR::Range MyDevice::getGainRange(const int direction, const size_t channel, const std::string& name) const {
+SoapySDR::Range IIODevice::getGainRange(const int direction, const size_t channel, const std::string& name) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     (void)name;
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange2");
     return SoapySDR::Range(-20, 90);
 }
-void MyDevice::setGainMode(const int direction, const size_t channel, const bool automatic) {
+void IIODevice::setGainMode(const int direction, const size_t channel, const bool automatic) {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "setGainMode ");
     device->set_gain_mode(direction == SOAPY_SDR_TX, automatic);
 }
 
-bool MyDevice::hasGainMode(const int direction, const size_t channel) const {
+bool IIODevice::hasGainMode(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "hasGainMode ");
     return true;
 }
 
-bool MyDevice::getGainMode(const int direction, const size_t channel) const {
+bool IIODevice::getGainMode(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainMode ");
     return device->get_gain_mode(direction == SOAPY_SDR_TX);
 }
 
-SoapySDR::RangeList MyDevice::getFrequencyRange(const int direction, const size_t channel, const std::string& name) const {
+SoapySDR::RangeList IIODevice::getFrequencyRange(const int direction, const size_t channel, const std::string& name) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getFrequencyRange");
@@ -231,7 +231,7 @@ SoapySDR::RangeList MyDevice::getFrequencyRange(const int direction, const size_
     return {};
     // return (SoapySDR::RangeList(1, SoapySDR::Range(MHZ(70), GHZ(6))));
 }
-std::vector<std::string> MyDevice::listFrequencies(const int direction, const size_t channel) const {
+std::vector<std::string> IIODevice::listFrequencies(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "listFrequencies");
@@ -239,14 +239,14 @@ std::vector<std::string> MyDevice::listFrequencies(const int direction, const si
     names.push_back("RF");
     return (names);
 }
-int MyDevice::activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t) {
+int IIODevice::activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "activateStream");
-    auto* s = reinterpret_cast<DummyStream*>(stream);
+    auto* s = reinterpret_cast<Stream*>(stream);
     s->active = true;
     return 0;
 }
 
-void MyDevice::setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args) {
+void IIODevice::setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args) {
     (void)channel;
     (void)frequency;
     (void)args;
@@ -254,7 +254,7 @@ void MyDevice::setFrequency(const int direction, const size_t channel, const dou
     device->set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
 }
 
-void MyDevice::setFrequency(const int direction, const size_t channel, const std::string& name, const double frequency, const SoapySDR::Kwargs& args) {
+void IIODevice::setFrequency(const int direction, const size_t channel, const std::string& name, const double frequency, const SoapySDR::Kwargs& args) {
     (void)channel;
     (void)frequency;
     (void)args;
@@ -262,43 +262,43 @@ void MyDevice::setFrequency(const int direction, const size_t channel, const std
     device->set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
 }
 
-void MyDevice::setBandwidth(const int direction, const size_t channel, const double bw) {
+void IIODevice::setBandwidth(const int direction, const size_t channel, const double bw) {
     (void)channel;  // TODO: second channel
     device->set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
 }
 
-void MyDevice::setSampleRate(const int direction, const size_t channel, const double rate) {
+void IIODevice::setSampleRate(const int direction, const size_t channel, const double rate) {
     (void)channel;  // TODO: second channel
     device->set_sample_rate(static_cast<long long>(rate), direction == SOAPY_SDR_TX);
 }
 
-double MyDevice::getFrequency(const int direction, const size_t channel) const {
+double IIODevice::getFrequency(const int direction, const size_t channel) const {
     (void)channel;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getFrequency ");
     return device->get_frequency(direction == SOAPY_SDR_TX);
 }
 
-std::vector<std::string> MyDevice::listGains(const int direction, const size_t channel) const {
+std::vector<std::string> IIODevice::listGains(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     SoapySDR_logf(SOAPY_SDR_DEBUG, "listGains");
     return {"hardwaregain"};
 }
 
-MyDevice::MyDevice(int i) {
+IIODevice::IIODevice(int i) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor %d", i);
     device = new AD9361("ip:192.168.88.194");
 }
 
-MyDevice::~MyDevice() {
+IIODevice::~IIODevice() {
     if (device) {
         delete device;
     }
 }
 
-int MyDevice::deactivateStream(SoapySDR::Stream* stream, const int, const long long) {
+int IIODevice::deactivateStream(SoapySDR::Stream* stream, const int, const long long) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "deactivateStream");
-    auto* s = reinterpret_cast<DummyStream*>(stream);
+    auto* s = reinterpret_cast<Stream*>(stream);
     s->active = false;
     return 0;
 }

@@ -8,7 +8,7 @@
 #include "ad9361.hpp"
 
 using namespace std;
-class MyDevice : public SoapySDR::Device {
+class IIODevice : public SoapySDR::Device {
    public:
     std::string getDriverKey(void) const;
     std::string getHardwareKey(void) const;
@@ -42,8 +42,8 @@ class MyDevice : public SoapySDR::Device {
     double getGain(const int direction, const size_t channel) const;
     double getGain(const int direction, const size_t channel, const std::string& name) const;
 
-    MyDevice(int i);
-    ~MyDevice();
+    IIODevice(int i);
+    ~IIODevice();
 
    private:
     AD9361* device;

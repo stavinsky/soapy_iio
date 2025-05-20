@@ -14,8 +14,6 @@
 
 #include "IIODevice.hpp"
 
-
-
 #define IIO_ENSURE(expr)                                                             \
     {                                                                                \
         if (!(expr)) {                                                               \
@@ -42,7 +40,7 @@ SoapySDR::Device* makeMyDevice(const SoapySDR::Kwargs& args) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "makeMyDevice ");
     // create an instance of the device object given the args
     // here we will translate args into something used in the constructor
-    return new MyDevice(1);
+    return new IIODevice(1);
 }
 
 static SoapySDR::Registry registerMyDevice("my_device", &findMyDevice, &makeMyDevice, SOAPY_SDR_ABI_VERSION);
