@@ -42,9 +42,9 @@ class IIODevice : public SoapySDR::Device {
     double getGain(const int direction, const size_t channel) const;
     double getGain(const int direction, const size_t channel, const std::string& name) const;
 
-    IIODevice(int i);
+    IIODevice();
     ~IIODevice();
 
    private:
-    AD9361* device;
+    std::unique_ptr<AD9361> device;
 };

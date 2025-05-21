@@ -1,5 +1,6 @@
 #include "IIODevice.hpp"
 
+#include <memory>
 #include <thread>
 
 #include "Stream.hpp"
@@ -57,7 +58,12 @@ SoapySDR::Stream* IIODevice::setupStream(const int direction, const std::string&
 void IIODevice::closeStream(SoapySDR::Stream* stream) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "close stream  ");
     Stream* s = reinterpret_cast<Stream*>(stream);
-    delete s;
+    std::lock_guard<std::mutex> lock(s->mtx);
+    if (s) {
+        delete s;
+    }
+    // device.reset();
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "close stream  done");
 }
 
 std::vector<std::string> IIODevice::getStreamFormats(const int direction, const size_t channel) const {
@@ -86,16 +92,18 @@ int IIODevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const si
 
     SoapySDR_logf(SOAPY_SDR_TRACE, "readStream ");
     Stream* s = reinterpret_cast<Stream*>(stream);
-    if (!s->active) {
-        if (timeoutUs > 0) {
-            std::this_thread::sleep_for(std::chrono::microseconds(timeoutUs));
-        }
-        return SOAPY_SDR_TIMEOUT;
-    }
+
     size_t output_counter = 0;
     void* rawBuffer = buffs[0];
     SoapySDR_logf(SOAPY_SDR_TRACE, "before while");
     while (output_counter < numElems) {
+        if (!s->active.load(std::memory_order_acquire)) {
+            if (timeoutUs > 0) {
+                std::this_thread::sleep_for(std::chrono::microseconds(timeoutUs));
+            }
+            return SOAPY_SDR_TIMEOUT;
+        }
+        s->active.load(std::memory_order_acquire);
         if (s->current_buffer_finished) {
             s->prepare_next_block();
         }
@@ -195,7 +203,7 @@ SoapySDR::Range IIODevice::getGainRange(const int direction, const size_t channe
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
     (void)name;
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "getGainRange2");
+    SoapySDR_logf(SOAPY_SDR_TRACE, "getGainRange2");
     return SoapySDR::Range(-20, 90);
 }
 void IIODevice::setGainMode(const int direction, const size_t channel, const bool automatic) {
@@ -242,7 +250,8 @@ std::vector<std::string> IIODevice::listFrequencies(const int direction, const s
 int IIODevice::activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "activateStream");
     auto* s = reinterpret_cast<Stream*>(stream);
-    s->active = true;
+    s->rx_channel_enable();
+
     return 0;
 }
 
@@ -250,7 +259,7 @@ void IIODevice::setFrequency(const int direction, const size_t channel, const do
     (void)channel;
     (void)frequency;
     (void)args;
-    SoapySDR_logf(SOAPY_SDR_WARNING, "setFrequency %d", direction);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "setFrequency %d", direction);
     device->set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
 }
 
@@ -258,7 +267,7 @@ void IIODevice::setFrequency(const int direction, const size_t channel, const st
     (void)channel;
     (void)frequency;
     (void)args;
-    SoapySDR_logf(SOAPY_SDR_WARNING, "setFrequency %s %d", name.c_str(), direction);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "setFrequency %s %d", name.c_str(), direction);
     device->set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
 }
 
@@ -281,24 +290,24 @@ double IIODevice::getFrequency(const int direction, const size_t channel) const 
 std::vector<std::string> IIODevice::listGains(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "listGains");
+    SoapySDR_logf(SOAPY_SDR_TRACE, "listGains");
     return {"hardwaregain"};
 }
 
-IIODevice::IIODevice(int i) {
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor %d", i);
-    device = new AD9361("ip:192.168.88.194");
+IIODevice::IIODevice() {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor ");
+    device = std::make_unique<AD9361>("ip:192.168.88.194");
 }
 
 IIODevice::~IIODevice() {
-    if (device) {
-        delete device;
-    }
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Destructor ");
 }
 
 int IIODevice::deactivateStream(SoapySDR::Stream* stream, const int, const long long) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "deactivateStream");
     auto* s = reinterpret_cast<Stream*>(stream);
-    s->active = false;
+
+    s->rx_channel_disable();
+
     return 0;
 }

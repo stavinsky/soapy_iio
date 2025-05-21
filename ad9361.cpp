@@ -107,13 +107,16 @@ AD9361::AD9361(std::string url) {
     if (!device_input) {
         throw std::runtime_error("No device_input");
     }
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "constructor end");
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 constructor end");
 }
 
 AD9361::~AD9361() {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 destructor start");
+
     if (ctx) {
         iio_context_destroy(ctx);
     }
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 destructor end");
 }
 
 int AD9361::set_channel_param(iio_channel* channel, const char* key, long long value) {

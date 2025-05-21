@@ -18,13 +18,14 @@ class Stream {
     int16_t* p_end;
     iio_channel* rx_ch_i;
     iio_channel* rx_ch_q;
-    bool active = false;
     iio_device* device;
-    const iio_block* rx_block;
 
     void rx_channel_enable();
+    void rx_channel_disable();
     size_t get_rx_sample_size();
     Stream(iio_device* device);
     ~Stream();
     void prepare_next_block();
+    std::atomic<bool> active{false};
+    std::mutex mtx;
 };

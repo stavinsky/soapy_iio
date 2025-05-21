@@ -36,11 +36,10 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
 }
 SoapySDR::Device* makeMyDevice(const SoapySDR::Kwargs& args) {
     (void)args;
-    SoapySDR::setLogLevel(SOAPY_SDR_DEBUG);
+    // SoapySDR::setLogLevel(SOAPY_SDR_DEBUG);
     SoapySDR_logf(SOAPY_SDR_DEBUG, "makeMyDevice ");
-    // create an instance of the device object given the args
-    // here we will translate args into something used in the constructor
-    return new IIODevice(1);
+
+    return new IIODevice();
 }
 
 static SoapySDR::Registry registerMyDevice("my_device", &findMyDevice, &makeMyDevice, SOAPY_SDR_ABI_VERSION);
