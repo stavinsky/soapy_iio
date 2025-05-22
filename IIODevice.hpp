@@ -13,6 +13,7 @@ class IIODevice : public SoapySDR::Device {
     std::string getDriverKey(void) const;
     std::string getHardwareKey(void) const;
     size_t getNumChannels(const int direction) const;
+    SoapySDR::Kwargs getChannelInfo(const int direction, const size_t channel) const;
     bool getFullDuplex(const int direction, const size_t channel) const;
     SoapySDR::Stream* setupStream(const int direction, const std::string& format, const std::vector<size_t>& channels, const SoapySDR::Kwargs& args);
     void closeStream(SoapySDR::Stream* stream);
@@ -46,5 +47,5 @@ class IIODevice : public SoapySDR::Device {
     ~IIODevice();
 
    private:
-    std::unique_ptr<AD9361> device;
+    AD9361* device;
 };

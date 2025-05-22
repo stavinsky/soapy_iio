@@ -28,9 +28,10 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
     (void)args;
     SoapySDR::Kwargs options;
     options["device"] = "MyDevice";
+    options["driver"] = "my_device";
+    options["label"] = "my_device";
     results.push_back(options);
     // SoapySDR_logf(SOAPY_SDR_DEBUG, "hello world %s", args.at("test").c_str());
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "hello world ");
 
     return results;
 }
