@@ -22,7 +22,7 @@ class AD9361 {
     void set_gain_mode(bool output, bool automatic);
     bool get_gain_mode(bool output);
     double get_gain(bool output);
-    double get_bandwidth_frequency(int channle, bool output);
+    double get_bandwidth_frequency(size_t channle, bool output);
 
    private:
     iio_channel* phy_channel_input;

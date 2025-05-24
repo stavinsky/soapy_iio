@@ -96,13 +96,13 @@ std::string IIODevice::getNativeStreamFormat(const int direction, const size_t c
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getNativeFormat ");
     (void)direction;
     (void)channel;
-    (void)fullScale;
+    fullScale = 8191.0;
     return SOAPY_SDR_CS16;
 }
 
 int IIODevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const size_t numElems, int& flags, long long& timeNs, const long timeoutUs) {
-    (void)flags;
-    (void)timeNs;
+    flags = 0;
+    timeNs = 0;
 
     SoapySDR_logf(SOAPY_SDR_TRACE, "readStream ");
     Stream* s = reinterpret_cast<Stream*>(stream);
@@ -149,6 +149,10 @@ int IIODevice::readStream(SoapySDR::Stream* stream, void* const* buffs, const si
     }
     SoapySDR_logf(SOAPY_SDR_TRACE, "after while");
     return static_cast<int>(numElems);
+}
+
+size_t IIODevice::getStreamMTU(SoapySDR::Stream* stream) const {
+    return BLOCK_SIZE;
 }
 
 double IIODevice::getSampleRate(const int direction, const size_t channel) const {
@@ -253,6 +257,13 @@ SoapySDR::RangeList IIODevice::getFrequencyRange(const int direction, const size
     return {};
     // return (SoapySDR::RangeList(1, SoapySDR::Range(MHZ(70), GHZ(6))));
 }
+SoapySDR::RangeList IIODevice::getFrequencyRange(const int direction, const size_t channel) const {
+    (void)channel;    // TODO: second channel
+    (void)direction;  // TODO: Direction
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "getFrequencyRange without name");
+
+    return {SoapySDR::Range(MHZ(70), GHZ(6))};
+}
 std::vector<std::string> IIODevice::listFrequencies(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
@@ -261,7 +272,7 @@ std::vector<std::string> IIODevice::listFrequencies(const int direction, const s
     names.push_back("RF");
     return (names);
 }
-int IIODevice::activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t) {
+int IIODevice::activateStream(SoapySDR::Stream* stream, const int flags, const long long timeNs, const size_t numElems) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "activateStream");
     auto* s = reinterpret_cast<Stream*>(stream);
     s->rx_channel_enable();
@@ -326,10 +337,14 @@ int IIODevice::deactivateStream(SoapySDR::Stream* stream, const int, const long 
 }
 
 double IIODevice::getBandwidth(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "getBandwidth");
     return device->get_bandwidth_frequency(channel, direction == SOAPY_SDR_TX);
 }
 
 std::vector<double> IIODevice::listBandwidths(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "listBandwidths");
+    (void)direction;
+    (void)channel;
     std::vector<double> list;
     list.push_back(200000);
     list.push_back(MHZ(1));
@@ -351,11 +366,37 @@ std::vector<double> IIODevice::listBandwidths(const int direction, const size_t 
 }
 
 SoapySDR::RangeList IIODevice::getBandwidthRange(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "getBandwidthRange");
+    (void)direction;
+    (void)channel;
     SoapySDR::RangeList range_list = SoapySDR::RangeList();
     range_list.push_back(SoapySDR::Range(200000, MHZ(50)));
     return range_list;
 }
 void IIODevice::setBandwidth(const int direction, const size_t channel, const double bw) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "setBandwidth");
     (void)channel;  // TODO: second channel
     device->set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
+}
+
+std::vector<std::string> IIODevice::listAntennas(const int direction, const size_t channel) const {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "listAntennas");
+    std::vector<std::string> list;
+    if (direction == SOAPY_SDR_RX and channel == 0) {
+        list.push_back("RX0");
+    }
+    return list;
+}
+
+void IIODevice::setAntenna(const int direction, const size_t channel, const std::string& name) {
+    (void)direction;
+    (void)channel;
+    (void)name;
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "setAntenna");
+}
+
+std::string IIODevice::getAntenna(const int direction, const size_t channel) const {
+    (void)direction;
+    (void)channel;
+    return std::string("RX0");
 }

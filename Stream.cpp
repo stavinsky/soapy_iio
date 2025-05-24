@@ -8,7 +8,6 @@ using namespace std;
 
 enum iodev { RX,
              TX };
-#define BLOCK_SIZE (32000 * 4)  // TODO: make parameter
 
 static char tmpstr[64];
 static char* get_ch_name(const char* type, int id) {

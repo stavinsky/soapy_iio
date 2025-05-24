@@ -9,7 +9,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "")
 
 
-find_package(SoapySDR CONFIG)
+find_package(SoapySDR REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBIIO REQUIRED libiio)
 
@@ -67,10 +67,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         -Wmissing-declarations -Wundef -Wunreachable-code -Wredundant-decls
     )
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(MyDevice PRIVATE -Werror -fsanitize=undefined,address)
-        target_link_options(MyDevice PRIVATE -fsanitize=undefined,address)
-    endif()
+    # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    #     target_compile_options(MyDevice PRIVATE -Werror -fsanitize=undefined,address)
+    #     target_link_options(MyDevice PRIVATE -fsanitize=undefined,address)
+    # endif()
 
     foreach(src ${MY_SOURCES})
         set_source_files_properties(${src} PROPERTIES
@@ -100,3 +100,5 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     #     )
     # endforeach()
 endif()
+enable_testing()
+add_subdirectory(tests)

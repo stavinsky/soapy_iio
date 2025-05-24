@@ -29,3 +29,4 @@ class Stream {
     std::atomic<bool> active{false};
     std::mutex mtx;
 };
+#define BLOCK_SIZE (32000 * 4)  // TODO: make parameter

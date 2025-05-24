@@ -67,5 +67,7 @@
   "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 0}",
   "cmake.environment": {
     "PKG_CONFIG_PATH": "/Users/stavinsky/dev/build/root/lib/pkgconfig/"
-  }
+  },
+  "cmake.buildBeforeRun": true,
+  "cmake.ctest.testExplorerIntegrationEnabled": true
 }

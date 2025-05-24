@@ -20,11 +20,13 @@ class IIODevice : public SoapySDR::Device {
     std::vector<std::string> getStreamFormats(const int direction, const size_t channel) const;
     std::string getNativeStreamFormat(const int direction, const size_t channel, double& fullScale) const;
     int readStream(SoapySDR::Stream* stream, void* const* buffs, const size_t numElems, int& flags, long long& timeNs, const long timeoutUs = 100000);
+    size_t getStreamMTU(SoapySDR::Stream* stream) const;
     double getSampleRate(const int direction, const size_t channel) const;
     SoapySDR::RangeList getSampleRateRange(const int direction, const size_t channel) const;
     std::vector<double> listSampleRates(const int direction, const size_t channel) const;
     std::vector<std::string> listFrequencies(const int direction, const size_t channel) const;
     SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel, const std::string& name) const;
+    SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel) const;
     int deactivateStream(SoapySDR::Stream* stream, const int, const long long);
     int activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t);
     void setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args = SoapySDR::Kwargs());
@@ -42,10 +44,14 @@ class IIODevice : public SoapySDR::Device {
     double getGain(const int direction, const size_t channel) const;
     double getGain(const int direction, const size_t channel, const std::string& name) const;
 
-    virtual double getBandwidth(const int direction, const size_t channel) const;
-    virtual std::vector<double> listBandwidths(const int direction, const size_t channel) const;
-    virtual SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
+    double getBandwidth(const int direction, const size_t channel) const;
+    std::vector<double> listBandwidths(const int direction, const size_t channel) const;
+    SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
     void setBandwidth(const int direction, const size_t channel, const double bw);
+
+    std::vector<std::string> listAntennas(const int direction, const size_t channel) const;
+    void setAntenna(const int direction, const size_t channel, const std::string& name);
+    std::string getAntenna(const int direction, const size_t channel) const;
 
     IIODevice();
     ~IIODevice();
