@@ -162,7 +162,7 @@ SoapySDR::RangeList IIODevice::getSampleRateRange(const int direction, const siz
     // TODO: show real numbers
     SoapySDR_logf(SOAPY_SDR_DEBUG, "getSampleRateRange");
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range(0, 60000000));
+    ranges.push_back(SoapySDR::Range(MHZ(3), MHZ(61)));
 
     return ranges;
 }
@@ -172,9 +172,6 @@ std::vector<double> IIODevice::listSampleRates(const int direction, const size_t
 
     std::vector<double> options;
 
-    options.push_back(65105);  // 25M/48/8+1
-    options.push_back(1e6);
-    options.push_back(2e6);
     options.push_back(3e6);
     options.push_back(4e6);
     options.push_back(5e6);
@@ -208,6 +205,7 @@ double IIODevice::getGain(const int direction, const size_t channel, const std::
     (void)name;
     return device->get_gain(direction == SOAPY_SDR_TX);
 }
+
 SoapySDR::Range IIODevice::getGainRange(const int direction, const size_t channel) const {
     (void)channel;    // TODO: second channel
     (void)direction;  // TODO: Direction
@@ -287,12 +285,8 @@ void IIODevice::setFrequency(const int direction, const size_t channel, const st
     device->set_frequency(static_cast<long long>(frequency), direction == SOAPY_SDR_TX);
 }
 
-void IIODevice::setBandwidth(const int direction, const size_t channel, const double bw) {
-    (void)channel;  // TODO: second channel
-    device->set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
-}
-
 void IIODevice::setSampleRate(const int direction, const size_t channel, const double rate) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "setSampleRate channel:%d frequency: %f", channel, rate);
     (void)channel;  // TODO: second channel
     device->set_sample_rate(static_cast<long long>(rate), direction == SOAPY_SDR_TX);
 }
@@ -329,4 +323,39 @@ int IIODevice::deactivateStream(SoapySDR::Stream* stream, const int, const long 
     s->rx_channel_disable();
 
     return 0;
+}
+
+double IIODevice::getBandwidth(const int direction, const size_t channel) const {
+    return device->get_bandwidth_frequency(channel, direction == SOAPY_SDR_TX);
+}
+
+std::vector<double> IIODevice::listBandwidths(const int direction, const size_t channel) const {
+    std::vector<double> list;
+    list.push_back(200000);
+    list.push_back(MHZ(1));
+    list.push_back(MHZ(2));
+    list.push_back(MHZ(3));
+    list.push_back(MHZ(4));
+    list.push_back(MHZ(5));
+    list.push_back(MHZ(6));
+    list.push_back(MHZ(7));
+    list.push_back(MHZ(8));
+    list.push_back(MHZ(9));
+    list.push_back(MHZ(10));
+    list.push_back(MHZ(12));
+    list.push_back(MHZ(16));
+    list.push_back(MHZ(20));
+    list.push_back(MHZ(30));
+    list.push_back(MHZ(40));
+    return list;
+}
+
+SoapySDR::RangeList IIODevice::getBandwidthRange(const int direction, const size_t channel) const {
+    SoapySDR::RangeList range_list = SoapySDR::RangeList();
+    range_list.push_back(SoapySDR::Range(200000, MHZ(50)));
+    return range_list;
+}
+void IIODevice::setBandwidth(const int direction, const size_t channel, const double bw) {
+    (void)channel;  // TODO: second channel
+    device->set_bandwidth_frequency(static_cast<long long>(bw), direction == SOAPY_SDR_TX);
 }

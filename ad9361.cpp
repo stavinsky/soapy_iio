@@ -15,6 +15,14 @@ int AD9361::set_bandwidth_frequency(long long freq, bool output = false) {
     }
     return set_channel_param(phy_channel_input, "rf_bandwidth", freq);
 }
+double AD9361::get_bandwidth_frequency(int channle, bool output) {
+    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_bandwidth");
+    double value;
+    iio_attr_read_double(attr, &value);
+    return value;
+}
+
 double AD9361::get_sample_rate(bool output) {
     if (output == true) {
         return get_channel_param(phy_channel_output, "sampling_frequency");

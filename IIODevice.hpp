@@ -29,7 +29,6 @@ class IIODevice : public SoapySDR::Device {
     int activateStream(SoapySDR::Stream* stream, const int, const long long, const size_t);
     void setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs& args = SoapySDR::Kwargs());
     void setFrequency(const int direction, const size_t channel, const std::string& name, const double frequency, const SoapySDR::Kwargs& args = SoapySDR::Kwargs());
-    void setBandwidth(const int direction, const size_t channel, const double bw);
     void setSampleRate(const int direction, const size_t channel, const double rate);
     double getFrequency(const int direction, const size_t channel) const;
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
@@ -42,6 +41,11 @@ class IIODevice : public SoapySDR::Device {
     void setGain(const int direction, const size_t channel, const std::string& name, const double value);
     double getGain(const int direction, const size_t channel) const;
     double getGain(const int direction, const size_t channel, const std::string& name) const;
+
+    virtual double getBandwidth(const int direction, const size_t channel) const;
+    virtual std::vector<double> listBandwidths(const int direction, const size_t channel) const;
+    virtual SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
+    void setBandwidth(const int direction, const size_t channel, const double bw);
 
     IIODevice();
     ~IIODevice();

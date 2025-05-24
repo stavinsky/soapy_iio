@@ -31,13 +31,11 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
     options["driver"] = "my_device";
     options["label"] = "my_device";
     results.push_back(options);
-    // SoapySDR_logf(SOAPY_SDR_DEBUG, "hello world %s", args.at("test").c_str());
 
     return results;
 }
 SoapySDR::Device* makeMyDevice(const SoapySDR::Kwargs& args) {
     (void)args;
-    // SoapySDR::setLogLevel(SOAPY_SDR_DEBUG);
     SoapySDR_logf(SOAPY_SDR_DEBUG, "makeMyDevice ");
 
     return new IIODevice();
