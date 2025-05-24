@@ -3,8 +3,16 @@
 #include <iio.h>
 
 #include <string>
-
+#define BLOCK_SIZE (125 * 1024)  // TODO: make parameter
 using namespace std;
+struct rx_channel {
+    iio_channel* rx_ch_i;
+    iio_channel* rx_ch_q;
+};
+struct BlockPointer {
+    int16_t* current;
+    int16_t* end;
+};
 
 class AD9361 {
    public:
@@ -23,6 +31,15 @@ class AD9361 {
     bool get_gain_mode(bool output);
     double get_gain(bool output);
     double get_bandwidth_frequency(size_t channle, bool output);
+    void rx_channel_enable();
+    void rx_channel_disable();
+    size_t get_rx_sample_size();
+    BlockPointer prepare_next_block();
+
+    rx_channel rx_chan[2];
+    iio_channels_mask* rx_mask;
+    struct iio_buffer* rx_buffer;
+    struct iio_stream* rx_stream;
 
    private:
     iio_channel* phy_channel_input;

@@ -6,6 +6,7 @@
 #include <SoapySDR/Registry.hpp>
 
 #include "ad9361.hpp"
+#define BLOCK_SIZE (125 * 1024)  // TODO: make parameter
 
 using namespace std;
 class IIODevice : public SoapySDR::Device {

@@ -117,12 +117,26 @@ AD9361::AD9361(std::string url) {
     if (!device_input) {
         throw std::runtime_error("No device_input");
     }
+
+    rx_mask = iio_create_channels_mask(iio_device_get_channels_count(device_input));
+    if (!rx_mask) {
+        throw std::runtime_error("No rx_mask");
+    }
     SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 constructor end");
 }
 
 AD9361::~AD9361() {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 destructor start");
-
+    if (rx_mask) {
+        iio_channels_mask_destroy(rx_mask);
+    }
+    if (rx_stream) {
+        iio_stream_destroy(rx_stream);
+    }
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_stream destroed ");
+    if (rx_buffer) {
+        iio_buffer_destroy(rx_buffer);
+    }
     if (ctx) {
         iio_context_destroy(ctx);
     }
@@ -148,4 +162,71 @@ ssize_t AD9361::rf_port_select(iio_channel* channel, std::string rf_port) {
     const struct iio_attr* attr = iio_channel_find_attr(channel, "rf_port_select");
 
     return iio_attr_write_string(attr, rf_port.c_str());
+}
+
+size_t AD9361::get_rx_sample_size() {
+    ssize_t sample_rate = iio_device_get_sample_size(device_input, rx_mask);
+    return static_cast<size_t>(sample_rate);
+}
+void AD9361::rx_channel_enable() {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable");
+    uint8_t channel = 0;
+    if (!device_input) {
+        throw std::runtime_error("devce_input is not created");
+    }
+
+    rx_chan[channel].rx_ch_i = iio_device_find_channel(device_input, "voltage0", false);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable debug");
+    if (!rx_chan[channel].rx_ch_i) {
+        throw std::runtime_error("unable to get I channel");
+    }
+    rx_chan[channel].rx_ch_q = iio_device_find_channel(device_input, "voltage1", false);
+    if (!rx_chan[channel].rx_ch_q) {
+        throw std::runtime_error("unable to get Q channel");
+    }
+
+    iio_channel_enable(rx_chan[channel].rx_ch_i, rx_mask);
+    iio_channel_enable(rx_chan[channel].rx_ch_q, rx_mask);
+    // active.store(true, std::memory_order_release);
+    rx_buffer = iio_device_create_buffer(device_input, 0, rx_mask);
+    if (iio_err(rx_buffer) != 0) {
+        throw std::runtime_error("No rx_buffer");
+    }
+    rx_stream = iio_buffer_create_stream(rx_buffer, 4, BLOCK_SIZE);
+    if (iio_err(rx_stream) != 0) {
+        throw std::runtime_error("No rx_stream");
+    }
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable end");
+}
+void AD9361::rx_channel_disable() {
+    // active.store(false, std::memory_order_release);
+    uint8_t channel = 0;
+    rx_chan[channel].rx_ch_i = iio_device_find_channel(device_input, "voltage0", false);
+    if (!rx_chan[channel].rx_ch_i) {
+        throw std::runtime_error("unable to get I channel");
+    }
+    rx_chan[channel].rx_ch_q = iio_device_find_channel(device_input, "voltage1", false);
+    if (!rx_chan[channel].rx_ch_q) {
+        throw std::runtime_error("unable to get Q channel");
+    }
+    if (rx_mask && rx_chan[channel].rx_ch_i && rx_chan[channel].rx_ch_q) {
+        iio_channel_disable(rx_chan[channel].rx_ch_i, rx_mask);
+        iio_channel_disable(rx_chan[channel].rx_ch_q, rx_mask);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_disabled");
+    }
+}
+BlockPointer AD9361::prepare_next_block() {
+    // std::lock_guard<std::mutex> lock(mtx);
+    // if (!active.load(std::memory_order_acquire)) {
+    //     throw std::runtime_error("channel is not active");
+    // }
+    const iio_block* rx_block = iio_stream_get_next_block(rx_stream);
+    int err = iio_err(rx_block);
+    if (err) {
+        throw std::runtime_error("unable to receive block");
+    }
+
+    int16_t* p_end = reinterpret_cast<int16_t*>(iio_block_end(rx_block));
+    int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(rx_block, rx_chan[0].rx_ch_i));
+    return {p_start, p_end};
 }
