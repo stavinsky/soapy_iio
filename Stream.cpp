@@ -17,8 +17,6 @@ static char* get_ch_name(const char* type, int id) {
 
 static bool get_ad9361_stream_ch(enum iodev d, struct iio_device* dev, int chid, struct iio_channel** chn) {
     *chn = iio_device_find_channel(dev, get_ch_name("voltage", chid), d == TX);
-    if (!*chn)
-        *chn = iio_device_find_channel(dev, get_ch_name("altvoltage", chid), d == TX);
     return *chn != NULL;
 }
 

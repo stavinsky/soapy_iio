@@ -184,6 +184,9 @@ std::vector<double> IIODevice::listSampleRates(const int direction, const size_t
     options.push_back(8e6);
     options.push_back(9e6);
     options.push_back(10e6);
+    options.push_back(12e6);
+    options.push_back(14e6);
+    options.push_back(16e6);
     options.push_back(20e6);
     options.push_back(25e6);
     return (options);
