@@ -15,7 +15,7 @@
 int main() {
     const uint16_t channel = 0;
     SoapySDR::setLogLevel(SOAPY_SDR_DEBUG);
-    std::string loading_module_errors = SoapySDR::loadModule("libMyDevice.so");
+    std::string loading_module_errors = SoapySDR::loadModule("../libMyDevice.so");
     assert(loading_module_errors.empty());
     SoapySDR::KwargsList devices = SoapySDR::Device::enumerate();
     assert(devices.size() == 1);
@@ -37,10 +37,14 @@ int main() {
     str_list = sdr->listAntennas(SOAPY_SDR_RX, channel);
     printf("Rx antennas: ");
     for (int i = 0; i < str_list.size(); ++i)
-        printf("%s,", str_list[i].c_str());
+        printf("%s\n", str_list[i].c_str());
     printf("\n");
 
-    assert(str_list.size() == 1);  // list of antennas
+    assert(str_list.size() >= 1);  // list of antennas
+    sdr->setAntenna(SOAPY_SDR_RX, 0, std::string("A_BALANCED"));
+    std::string str = sdr->getAntenna(SOAPY_SDR_RX, 0);
+    printf("current antenna is %s\n", str.c_str());
+    assert(str == "A_BALANCED");
 
     str_list = sdr->listGains(SOAPY_SDR_RX, channel);
     printf("Rx Gains: ");
@@ -79,6 +83,18 @@ int main() {
     printf("set freq %f HZ, got freq %f HZ\n", expected_freq, freq);
     assert(std::abs(freq - expected_freq) < 100);
 
+    const double expected_bandwidth = 20e6;
+    sdr->setBandwidth(SOAPY_SDR_RX, channel, expected_bandwidth);
+    freq = sdr->getBandwidth(SOAPY_SDR_RX, channel);
+    printf("set freq %f HZ, got freq %f HZ\n", expected_bandwidth, freq);
+    assert(std::abs(freq - expected_bandwidth) < 100);
+
+    const double expected_gain = 3.3;
+    sdr->setGain(SOAPY_SDR_RX, channel, expected_gain);
+    freq = sdr->getGain(SOAPY_SDR_RX, channel);
+    printf("set freq %f HZ, got freq %f HZ\n", expected_gain, freq);
+    assert(std::abs(freq - expected_gain) < 100);
+
     double fullscale;
     std::string native_format = sdr->getNativeStreamFormat(SOAPY_SDR_RX, channel, fullscale);
     assert(fullscale == 8191.0);  // 14 bit
@@ -101,9 +117,9 @@ int main() {
         long long time_ns;
         int ret = sdr->readStream(rx_stream, buffs, 1024, flags, time_ns, 1e5);
         assert(ret > 0);
-        printf("ret = %d, flags = %d, time_ns = %lld\n", ret, flags, time_ns);
+        // printf("ret = %d, flags = %d, time_ns = %lld\n", ret, flags, time_ns);
     }
-    // 7. shutdown the stream
+
     sdr->deactivateStream(rx_stream, 0, 0);  // stop streaming
     sdr->closeStream(rx_stream);
 

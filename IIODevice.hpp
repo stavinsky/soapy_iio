@@ -34,6 +34,7 @@ class IIODevice : public SoapySDR::Device {
     void setFrequency(const int direction, const size_t channel, const std::string& name, const double frequency, const SoapySDR::Kwargs& args = SoapySDR::Kwargs());
     void setSampleRate(const int direction, const size_t channel, const double rate);
     double getFrequency(const int direction, const size_t channel) const;
+    double getFrequency(const int direction, const size_t channel, const std::string& name) const;
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
     void setGainMode(const int direction, const size_t channel, const bool automatic);
     bool hasGainMode(const int direction, const size_t channel) const;

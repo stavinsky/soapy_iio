@@ -8,10 +8,17 @@ Currently designed as a **proof-of-concept** (PoC), with limited functionality a
 This project is **not production-ready**. It works for the author's setup but may require adjustments for others.  
 Feel free to experiment or adapt — use at your own risk.
 
+## Tested with:
+
+- SDR++
+- CubicSDR
+- SDRAngel
+- GNU Radio
+
 ## ✅ Features
 
 - Connects to remote IIO device using hardcoded IP address
-- Supports **only one RX channel** (channel 0)
+- Supports **only both RX channel** (channel 0, 1)
 - Block size, IP, available frequencies, and gain settings are all hardcoded
 - Uses [libiio](https://github.com/analogdevicesinc/libiio) v1 (still in beta)
 - Works on **macOS** with Homebrew-installed dependencies
@@ -49,7 +56,7 @@ This project is shared as-is. There is:
 
 - No automatic configuration
 - No runtime detection of capabilities
-- No multi-channel or TX support (yet)
+- No TX support (yet)
 
 notes:
 

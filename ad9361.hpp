@@ -3,6 +3,7 @@
 #include <iio.h>
 
 #include <string>
+#include <vector>
 #define BLOCK_SIZE (125 * 1024)  // TODO: make parameter
 using namespace std;
 struct rx_channel {
@@ -26,15 +27,19 @@ class AD9361 {
     iio_context* ctx;
     double get_sample_rate(bool output);
     double get_frequency(bool output);
-    int set_gain(double value, bool output);
-    void set_gain_mode(bool output, bool automatic);
-    bool get_gain_mode(bool output);
-    double get_gain(bool output);
-    double get_bandwidth_frequency(size_t channle, bool output);
-    void rx_channel_enable();
-    void rx_channel_disable();
+    int set_gain(uint8_t channel, double value, bool output);
+    void set_gain_mode(uint8_t channel, bool output, bool automatic);
+    bool get_gain_mode(uint8_t channel, bool output);
+    double get_gain(uint8_t channe, bool output);
+    double get_bandwidth_frequency(bool output);
+    void rx_channel_enable(uint8_t channel);
+    void rx_channel_disable(uint8_t channel);
     size_t get_rx_sample_size();
     BlockPointer prepare_next_block();
+
+    std::vector<std::string> get_available_rf_ports(uint8_t channel, bool output);
+    ssize_t rf_port_select(uint8_t channel, bool output, std::string rf_port);
+    std::string get_rf_port(uint8_t channel, bool output);
 
     rx_channel rx_chan[2];
     iio_channels_mask* rx_mask;
@@ -51,5 +56,4 @@ class AD9361 {
     int set_channel_param(iio_channel* channel, const char* key, long long value);
     long long get_channel_param(iio_channel* channel, const char* key);
     int set_channel_param_double(iio_channel* channel, const char* key, double value);
-    ssize_t rf_port_select(iio_channel* channel, std::string rf_port);
 };

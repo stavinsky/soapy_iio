@@ -1,24 +1,59 @@
 #include "ad9361.hpp"
 
 #include <SoapySDR/Logger.hpp>
+#include <sstream>
+#include <vector>
 
-int AD9361::set_frequency(long long freq, bool output = false) {
+enum class IQ : char {
+    i = 'i',
+    q = 'q'
+};
+
+std::vector<std::string> split_string(std::string str) {
+    std::istringstream iss(str);
+    std::string word;
+    std::vector<std::string> words;
+    while (iss >> word) {
+        words.push_back(word);
+    }
+    return words;
+}
+std::string channel_voltage_name(uint8_t channel, IQ iq) {
+    std::string attr = "voltage";
+    if (channel == 0) {
+        if (iq == IQ::i) {
+            return attr + "0";
+        }
+        if (iq == IQ::q) {
+            return attr + "1";
+        }
+    } else if (channel == 1) {
+        if (iq == IQ::i) {
+            return attr + "2";
+        }
+        if (iq == IQ::q) {
+            return attr + "3";
+        }
+    } else {
+        throw std::runtime_error("channel could be only 0 or 1 ");
+    }
+}
+
+int AD9361::set_frequency(long long freq, bool output) {
     if (output == true) {
         return set_channel_param(lo_channel_output, "frequency", freq);
     }
     return set_channel_param(lo_channel_input, "frequency", freq);
 }
 
-int AD9361::set_bandwidth_frequency(long long freq, bool output = false) {
+int AD9361::set_bandwidth_frequency(long long freq, bool output) {
     if (output == true) {
         return set_channel_param(phy_channel_output, "rf_bandwidth", freq);
     }
     return set_channel_param(phy_channel_input, "rf_bandwidth", freq);
 }
-double AD9361::get_bandwidth_frequency(size_t channel, bool output) {
-    (void)channel;
-    (void)output;
-    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+double AD9361::get_bandwidth_frequency(bool output) {
+    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
     const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_bandwidth");
     double value;
     iio_attr_read_double(attr, &value);
@@ -39,30 +74,61 @@ double AD9361::get_frequency(bool output) {
     return get_channel_param(lo_channel_input, "frequency");
 }
 
-int AD9361::set_gain(double value, bool output) {
-    (void)output;  // TODO:
+int AD9361::set_gain(uint8_t channel, double value, bool output) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
+    }
+
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
     try {
-        iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
-        const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
         iio_attr_write_double(attr, value);
 
     } catch (...) {
     }
     return 0;
 }
-
-void AD9361::set_gain_mode(bool output, bool automatic) {
-    if (output == true) {
-        return;  // TODO:
+double AD9361::get_gain(uint8_t channel, bool output) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
     }
-    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
+    double value;
+    iio_attr_read_double(attr, &value);
+    return value;
+}
+void AD9361::set_gain_mode(uint8_t channel, bool output, bool automatic) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
+    }
     const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
     iio_attr_write_string(attr, automatic ? "slow_attack" : "manual");
 }
 
-bool AD9361::get_gain_mode(bool output) {
-    (void)output;  // TODO:
-    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
+bool AD9361::get_gain_mode(uint8_t channel, bool output) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
+    }
     const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
     char buf[64];
     iio_attr_read_raw(attr, buf, sizeof(buf));
@@ -71,16 +137,7 @@ bool AD9361::get_gain_mode(bool output) {
     return mode != "manual";
 }
 
-double AD9361::get_gain(bool output) {
-    (void)output;  // TODO:
-    iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", false);
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
-    double value;
-    iio_attr_read_double(attr, &value);
-    return value;
-}
-
-int AD9361::set_sample_rate(long long freq, bool output = false) {
+int AD9361::set_sample_rate(long long freq, bool output) {
     if (output == true) {
         return set_channel_param(phy_channel_output, "sampling_frequency", freq);
     }
@@ -109,8 +166,6 @@ AD9361::AD9361(std::string url) {
     if (!lo_channel_output) {
         throw std::runtime_error("No lo_channel_output found");
     }
-    rf_port_select(phy_channel_input, "A_BALANCED");
-    rf_port_select(phy_channel_output, "A_BALANCED");
 
     device_output = iio_context_find_device(ctx, "cf-ad9361-dds-core-lpc");
     device_input = iio_context_find_device(ctx, "cf-ad9361-lpc");
@@ -158,36 +213,27 @@ long long AD9361::get_channel_param(iio_channel* channel, const char* key) {
     return val;
 }
 
-ssize_t AD9361::rf_port_select(iio_channel* channel, std::string rf_port) {
-    const struct iio_attr* attr = iio_channel_find_attr(channel, "rf_port_select");
-
-    return iio_attr_write_string(attr, rf_port.c_str());
-}
-
 size_t AD9361::get_rx_sample_size() {
     ssize_t sample_rate = iio_device_get_sample_size(device_input, rx_mask);
     return static_cast<size_t>(sample_rate);
 }
-void AD9361::rx_channel_enable() {
+void AD9361::rx_channel_enable(uint8_t channel) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable");
-    uint8_t channel = 0;
     if (!device_input) {
         throw std::runtime_error("devce_input is not created");
     }
 
-    rx_chan[channel].rx_ch_i = iio_device_find_channel(device_input, "voltage0", false);
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable debug");
+    rx_chan[channel].rx_ch_i = iio_device_find_channel(device_input, channel_voltage_name(channel, IQ::i).c_str(), false);
     if (!rx_chan[channel].rx_ch_i) {
         throw std::runtime_error("unable to get I channel");
     }
-    rx_chan[channel].rx_ch_q = iio_device_find_channel(device_input, "voltage1", false);
+    rx_chan[channel].rx_ch_q = iio_device_find_channel(device_input, channel_voltage_name(channel, IQ::q).c_str(), false);
     if (!rx_chan[channel].rx_ch_q) {
         throw std::runtime_error("unable to get Q channel");
     }
 
     iio_channel_enable(rx_chan[channel].rx_ch_i, rx_mask);
     iio_channel_enable(rx_chan[channel].rx_ch_q, rx_mask);
-    // active.store(true, std::memory_order_release);
     rx_buffer = iio_device_create_buffer(device_input, 0, rx_mask);
     if (iio_err(rx_buffer) != 0) {
         throw std::runtime_error("No rx_buffer");
@@ -198,14 +244,12 @@ void AD9361::rx_channel_enable() {
     }
     SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable end");
 }
-void AD9361::rx_channel_disable() {
-    // active.store(false, std::memory_order_release);
-    uint8_t channel = 0;
-    rx_chan[channel].rx_ch_i = iio_device_find_channel(device_input, "voltage0", false);
+void AD9361::rx_channel_disable(uint8_t channel) {
+    rx_chan[channel].rx_ch_i = iio_device_find_channel(device_input, channel_voltage_name(channel, IQ::i).c_str(), false);
     if (!rx_chan[channel].rx_ch_i) {
         throw std::runtime_error("unable to get I channel");
     }
-    rx_chan[channel].rx_ch_q = iio_device_find_channel(device_input, "voltage1", false);
+    rx_chan[channel].rx_ch_q = iio_device_find_channel(device_input, channel_voltage_name(channel, IQ::q).c_str(), false);
     if (!rx_chan[channel].rx_ch_q) {
         throw std::runtime_error("unable to get Q channel");
     }
@@ -227,6 +271,53 @@ BlockPointer AD9361::prepare_next_block() {
     }
 
     int16_t* p_end = reinterpret_cast<int16_t*>(iio_block_end(rx_block));
-    int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(rx_block, rx_chan[0].rx_ch_i));
+    iio_channel* ch = (rx_chan[0].rx_ch_i) ? rx_chan[0].rx_ch_i : rx_chan[1].rx_ch_i;
+    if (!ch) {
+        throw std::runtime_error("can't prepare block. wrong channel selected");
+    }
+    int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(rx_block, ch));
     return {p_start, p_end};
+}
+
+std::vector<std::string> AD9361::get_available_rf_ports(uint8_t channel, bool output) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
+    }
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_port_select_available");
+    char buf[500];
+    iio_attr_read_raw(attr, buf, sizeof(buf));
+    return split_string(buf);
+}
+ssize_t AD9361::rf_port_select(uint8_t channel, bool output, std::string rf_port) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
+    }
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_port_select");
+
+    return iio_attr_write_string(attr, rf_port.c_str());
+}
+
+std::string AD9361::get_rf_port(uint8_t channel, bool output) {
+    iio_channel* chan;
+    if (channel == 0) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
+    } else if (channel == 1) {
+        chan = iio_device_find_channel(ad9361_phy, "voltage1", output);
+    } else {
+        throw std::runtime_error("can't create context. check url");
+    }
+    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_port_select");
+    char buf[500];
+    iio_attr_read_raw(attr, buf, sizeof(buf));
+    return std::string(buf);
 }
