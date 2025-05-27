@@ -168,6 +168,9 @@ AD9361::AD9361(std::string url) {
     }
 
     device_output = iio_context_find_device(ctx, "cf-ad9361-dds-core-lpc");
+    if (!device_output) {
+        throw std::runtime_error("No device_input");
+    }
     device_input = iio_context_find_device(ctx, "cf-ad9361-lpc");
     if (!device_input) {
         throw std::runtime_error("No device_input");
@@ -175,6 +178,10 @@ AD9361::AD9361(std::string url) {
 
     rx_mask = iio_create_channels_mask(iio_device_get_channels_count(device_input));
     if (!rx_mask) {
+        throw std::runtime_error("No rx_mask");
+    }
+    tx_mask = iio_create_channels_mask(iio_device_get_channels_count(device_output));
+    if (!tx_mask) {
         throw std::runtime_error("No rx_mask");
     }
     SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 constructor end");
@@ -259,11 +266,51 @@ void AD9361::rx_channel_disable(uint8_t channel) {
         SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_disabled");
     }
 }
+
+void AD9361::tx_channel_enable(uint8_t channel) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_channel_enable");
+    if (!device_output) {
+        throw std::runtime_error("devce_input is not created");
+    }
+
+    tx_chan[channel].tx_ch_i = iio_device_find_channel(device_output, channel_voltage_name(channel, IQ::i).c_str(), true);
+    if (!tx_chan[channel].tx_ch_i) {
+        throw std::runtime_error("unable to get I channel");
+    }
+    tx_chan[channel].tx_ch_q = iio_device_find_channel(device_output, channel_voltage_name(channel, IQ::q).c_str(), true);
+    if (!tx_chan[channel].tx_ch_q) {
+        throw std::runtime_error("unable to get Q channel");
+    }
+
+    iio_channel_enable(tx_chan[channel].tx_ch_i, tx_mask);
+    iio_channel_enable(tx_chan[channel].tx_ch_q, tx_mask);
+    tx_buffer = iio_device_create_buffer(device_output, 0, tx_mask);
+    if (iio_err(tx_buffer) != 0) {
+        throw std::runtime_error("No tx_buffer");
+    }
+    tx_stream = iio_buffer_create_stream(tx_buffer, 4, BLOCK_SIZE);
+    if (iio_err(tx_stream) != 0) {
+        throw std::runtime_error("No tx_stream");
+    }
+
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_channel_enable end");
+}
+void AD9361::tx_channel_disable(uint8_t channel) {
+    tx_chan[channel].tx_ch_i = iio_device_find_channel(device_output, channel_voltage_name(channel, IQ::i).c_str(), true);
+    if (!tx_chan[channel].tx_ch_i) {
+        throw std::runtime_error("unable to get I channel");
+    }
+    tx_chan[channel].tx_ch_q = iio_device_find_channel(device_output, channel_voltage_name(channel, IQ::q).c_str(), true);
+    if (!tx_chan[channel].tx_ch_q) {
+        throw std::runtime_error("unable to get Q channel");
+    }
+    if (tx_mask && tx_chan[channel].tx_ch_i && tx_chan[channel].tx_ch_q) {
+        iio_channel_disable(tx_chan[channel].tx_ch_i, tx_mask);
+        iio_channel_disable(tx_chan[channel].tx_ch_q, tx_mask);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_channel_disabled");
+    }
+}
 BlockPointer AD9361::prepare_next_block() {
-    // std::lock_guard<std::mutex> lock(mtx);
-    // if (!active.load(std::memory_order_acquire)) {
-    //     throw std::runtime_error("channel is not active");
-    // }
     const iio_block* rx_block = iio_stream_get_next_block(rx_stream);
     int err = iio_err(rx_block);
     if (err) {
@@ -276,6 +323,22 @@ BlockPointer AD9361::prepare_next_block() {
         throw std::runtime_error("can't prepare block. wrong channel selected");
     }
     int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(rx_block, ch));
+    return {p_start, p_end};
+}
+
+BlockPointer AD9361::prepare_next_block_tx() {
+    const iio_block* tx_block = iio_stream_get_next_block(tx_stream);
+    int err = iio_err(tx_block);
+    if (err) {
+        throw std::runtime_error("unable to receive block");
+    }
+
+    int16_t* p_end = reinterpret_cast<int16_t*>(iio_block_end(tx_block));
+    iio_channel* ch = (tx_chan[0].tx_ch_i) ? tx_chan[0].tx_ch_i : tx_chan[1].tx_ch_i;
+    if (!ch) {
+        throw std::runtime_error("can't prepare block. wrong channel selected");
+    }
+    int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(tx_block, ch));
     return {p_start, p_end};
 }
 

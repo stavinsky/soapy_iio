@@ -21,6 +21,7 @@ class IIODevice : public SoapySDR::Device {
     std::vector<std::string> getStreamFormats(const int direction, const size_t channel) const;
     std::string getNativeStreamFormat(const int direction, const size_t channel, double& fullScale) const;
     int readStream(SoapySDR::Stream* stream, void* const* buffs, const size_t numElems, int& flags, long long& timeNs, const long timeoutUs = 100000);
+    int writeStream(SoapySDR::Stream* stream, const void* const* buffs, const size_t numElems, int& flags, const long long timeNs = 0, const long timeoutUs = 100000);
     size_t getStreamMTU(SoapySDR::Stream* stream) const;
     double getSampleRate(const int direction, const size_t channel) const;
     SoapySDR::RangeList getSampleRateRange(const int direction, const size_t channel) const;

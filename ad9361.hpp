@@ -10,6 +10,10 @@ struct rx_channel {
     iio_channel* rx_ch_i;
     iio_channel* rx_ch_q;
 };
+struct tx_channel {
+    iio_channel* tx_ch_i;
+    iio_channel* tx_ch_q;
+};
 struct BlockPointer {
     int16_t* current;
     int16_t* end;
@@ -34,17 +38,29 @@ class AD9361 {
     double get_bandwidth_frequency(bool output);
     void rx_channel_enable(uint8_t channel);
     void rx_channel_disable(uint8_t channel);
+
+    void tx_channel_enable(uint8_t channel);
+    void tx_channel_disable(uint8_t channel);
+
     size_t get_rx_sample_size();
     BlockPointer prepare_next_block();
+    BlockPointer prepare_next_block_tx();
 
     std::vector<std::string> get_available_rf_ports(uint8_t channel, bool output);
     ssize_t rf_port_select(uint8_t channel, bool output, std::string rf_port);
     std::string get_rf_port(uint8_t channel, bool output);
 
     rx_channel rx_chan[2];
+    tx_channel tx_chan[2];
+
     iio_channels_mask* rx_mask;
+    iio_channels_mask* tx_mask;
+
     struct iio_buffer* rx_buffer;
     struct iio_stream* rx_stream;
+
+    struct iio_buffer* tx_buffer;
+    struct iio_stream* tx_stream;
 
    private:
     iio_channel* phy_channel_input;
