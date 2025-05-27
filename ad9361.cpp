@@ -34,9 +34,8 @@ std::string channel_voltage_name(uint8_t channel, IQ iq) {
         if (iq == IQ::q) {
             return attr + "3";
         }
-    } else {
-        throw std::runtime_error("channel could be only 0 or 1 ");
     }
+    throw std::runtime_error("channel could be only 0 or 1 ");
 }
 
 int AD9361::set_frequency(long long freq, bool output) {
@@ -191,13 +190,29 @@ AD9361::~AD9361() {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 destructor start");
     if (rx_mask) {
         iio_channels_mask_destroy(rx_mask);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_mask destroed ");
     }
     if (rx_stream) {
         iio_stream_destroy(rx_stream);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_stream destroed ");
     }
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_stream destroed ");
+
     if (rx_buffer) {
         iio_buffer_destroy(rx_buffer);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_buffer destroed ");
+    }
+
+    if (tx_mask) {
+        iio_channels_mask_destroy(tx_mask);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_mask destroed ");
+    }
+    if (tx_stream) {
+        iio_stream_destroy(tx_stream);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_stream destroed ");
+    }
+    if (tx_buffer) {
+        iio_buffer_destroy(tx_buffer);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_buffer destroed ");
     }
     if (ctx) {
         iio_context_destroy(ctx);
