@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 
+#include "errors.hpp"
 enum class IQ : char {
     i = 'i',
     q = 'q'
@@ -326,10 +327,15 @@ void AD9361::tx_channel_disable(uint8_t channel) {
     }
 }
 BlockPointer AD9361::prepare_next_block() {
+    // TODO: set timeout
     const iio_block* rx_block = iio_stream_get_next_block(rx_stream);
     int err = iio_err(rx_block);
     if (err) {
-        throw std::runtime_error("unable to receive block");
+        if (err == -60) {
+            throw TimeoutError("get next block has timed out");
+        }
+        printf("error from libiio: %d ", err);
+        throw std::runtime_error("unable to receive block %d");
     }
 
     int16_t* p_end = reinterpret_cast<int16_t*>(iio_block_end(rx_block));
@@ -398,4 +404,21 @@ std::string AD9361::get_rf_port(uint8_t channel, bool output) {
     char buf[500];
     iio_attr_read_raw(attr, buf, sizeof(buf));
     return std::string(buf);
+}
+
+void AD9361::load_filter_from_buffer(std::vector<uint8_t> buffer) {
+    const iio_attr* filter_fir_config = iio_device_find_attr(ad9361_phy, "filter_fir_config");
+    ssize_t bytes = iio_attr_write_raw(filter_fir_config, buffer.data(), buffer.size());
+    if (bytes <= 0) {
+        throw std::runtime_error("loading filter failed");
+    }
+}
+
+void AD9361::fir_filter_enable(bool en) {
+    iio_channel* chan_out = iio_device_find_channel(ad9361_phy, "out", false);
+    const iio_attr* ch0_filter_fir_en = iio_channel_find_attr(chan_out, "voltage_filter_fir_en");
+    int err = iio_attr_write_bool(ch0_filter_fir_en, en);
+    if (err != 0) {
+        throw std::runtime_error("changing filter state failed");
+    }
 }

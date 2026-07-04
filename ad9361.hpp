@@ -50,17 +50,20 @@ class AD9361 {
     ssize_t rf_port_select(uint8_t channel, bool output, std::string rf_port);
     std::string get_rf_port(uint8_t channel, bool output);
 
+    void load_filter_from_buffer(std::vector<uint8_t> buffer);
+    void fir_filter_enable(bool en);
+
     rx_channel rx_chan[2];
     tx_channel tx_chan[2];
 
-    iio_channels_mask* rx_mask;
-    iio_channels_mask* tx_mask;
+    iio_channels_mask* rx_mask = NULL;
+    iio_channels_mask* tx_mask = NULL;
 
-    struct iio_buffer* rx_buffer;
-    struct iio_stream* rx_stream;
+    struct iio_buffer* rx_buffer = NULL;
+    struct iio_stream* rx_stream = NULL;
 
-    struct iio_buffer* tx_buffer;
-    struct iio_stream* tx_stream;
+    struct iio_buffer* tx_buffer = NULL;
+    struct iio_stream* tx_stream = NULL;
 
    private:
     iio_channel* phy_channel_input;

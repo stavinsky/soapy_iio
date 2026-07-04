@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 2.6...3.10)
 project(SoapySDRMyDevice CXX)
 enable_testing()
-
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE "Release")
    message(STATUS "Build type not specified: defaulting to release.")
@@ -102,3 +103,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 enable_testing()
 add_subdirectory(tests)
+
+
+add_executable(fir read_filter.cpp ad9361.cpp)
+target_include_directories(fir PRIVATE ${LIBIIO_INCLUDE_DIRS})
+target_link_libraries(fir ${LIBIIO_LIBRARIES} SoapySDR)
