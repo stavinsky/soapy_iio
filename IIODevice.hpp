@@ -56,7 +56,7 @@ class IIODevice : public SoapySDR::Device {
     void setAntenna(const int direction, const size_t channel, const std::string& name);
     std::string getAntenna(const int direction, const size_t channel) const;
 
-    IIODevice();
+    explicit IIODevice(const std::string& uri);
     ~IIODevice();
 
    private:

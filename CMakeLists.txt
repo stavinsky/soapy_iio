@@ -13,6 +13,7 @@ set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "")
 find_package(SoapySDR REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBIIO REQUIRED libiio)
+include(CheckCXXSourceCompiles)
 
 
 foreach(dir ${LIBIIO_INCLUDE_DIRS})
@@ -22,6 +23,24 @@ endforeach()
 link_directories(${LIBIIO_LIBRARY_DIRS})
 include_directories(${LIBIIO_INCLUDE_DIRS} )
 include_directories(SYSTEM ${MY_INCLUDE_DIRS} )
+
+set(CMAKE_REQUIRED_INCLUDES ${LIBIIO_INCLUDE_DIRS} ${MY_INCLUDE_DIRS})
+set(CMAKE_REQUIRED_LIBRARIES ${LIBIIO_LDFLAGS})
+check_cxx_source_compiles("
+    #include <iio.h>
+    int main() {
+        struct iio_scan *scan = iio_scan(NULL, \"ip,usb\");
+        if (iio_err(scan) == 0) {
+            iio_scan_destroy(scan);
+        }
+        return 0;
+    }
+" HAVE_IIO_SCAN)
+if(HAVE_IIO_SCAN)
+    message(STATUS "libiio scan support found; enabling ip/usb autodiscovery")
+else()
+    message(WARNING "libiio scan support was not found. Autodiscovery is disabled; pass uri=ip:<host> or uri=usb:, or point PKG_CONFIG_PATH at a libiio build with iio_scan().")
+endif()
 
 set(MY_SOURCES
     MyDeviceSupport.cpp
@@ -36,6 +55,10 @@ SOAPY_SDR_MODULE_UTIL(
     SOURCES ${MY_SOURCES}
     LIBRARIES ${LIBIIO_LIBRARIES}
 )
+
+if(HAVE_IIO_SCAN)
+    target_compile_definitions(MyDevice PRIVATE HAVE_IIO_SCAN=1)
+endif()
 
 
 

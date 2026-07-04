@@ -17,9 +17,10 @@ Feel free to experiment or adapt — use at your own risk.
 
 ## ✅ Features
 
-- Connects to remote IIO device using hardcoded IP address
+- Discovers AD9361 IIO devices over network (`ip`) and USB (`usb`) when built against libiio with scan support
+- Supports explicit IIO URIs such as `ip:192.168.2.1`, `ip:plutosdr.local`, and `usb:`
 - Supports **only both RX channel** (channel 0, 1)
-- Block size, IP, available frequencies, and gain settings are all hardcoded
+- Block size, available frequencies, and gain settings are all hardcoded
 - Uses [libiio](https://github.com/analogdevicesinc/libiio) v1 (still in beta)
 - Works on **macOS** with Homebrew-installed dependencies
 - Should work with any IIO-compatible URL (not limited to IP transport)
@@ -41,6 +42,38 @@ make install
 ```
 
 Make sure SoapySDR and libiio are installed in compatible paths.
+
+## 🔎 Discovery
+
+The module registers with SoapySDR as `driver=my_device`.
+
+Automatic discovery uses libiio scan support and scans the `ip,usb` backends:
+
+```bash
+SoapySDRUtil --find="driver=my_device"
+```
+
+Use an explicit URI when you want to bypass discovery:
+
+```bash
+SoapySDRUtil --probe="driver=my_device,uri=ip:192.168.2.1"
+SoapySDRUtil --probe="driver=my_device,uri=usb:"
+```
+
+You can also set a default URI to bypass flaky network discovery. This affects
+both enumeration and applications that call `make()` without a URI:
+
+```bash
+export MYDEVICE_IIO_URI=ip:192.168.88.67
+```
+
+To limit scanning to one transport:
+
+```bash
+export MYDEVICE_IIO_SCAN_BACKENDS=ip
+SoapySDRUtil --find="driver=my_device,backends=usb"
+SoapySDRUtil --find="driver=my_device,backends=ip"
+```
 
 ## 🌍 Environment & Disclaimer
 

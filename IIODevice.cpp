@@ -378,9 +378,9 @@ std::vector<std::string> IIODevice::listGains(const int direction, const size_t 
     return {"hardwaregain"};
 }
 
-IIODevice::IIODevice() {
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor ");
-    device = new AD9361("ip:192.168.88.194");
+IIODevice::IIODevice(const std::string& uri) {
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "MyDevice Constructor uri=%s", uri.c_str());
+    device = new AD9361(uri);
 }
 
 IIODevice::~IIODevice() {
