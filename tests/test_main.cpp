@@ -18,6 +18,10 @@ int main() {
     std::string loading_module_errors = SoapySDR::loadModule("../libMyDevice.so");
     assert(loading_module_errors.empty());
     SoapySDR::KwargsList devices = SoapySDR::Device::enumerate();
+    if (devices.empty()) {
+        std::cerr << "No my_device-compatible SDR discovered; skipping hardware integration test.\n";
+        return 77;
+    }
     assert(devices.size() == 1);
     SoapySDR::Kwargs::iterator it;
 

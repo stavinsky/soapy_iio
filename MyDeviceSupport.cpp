@@ -108,24 +108,31 @@ bool descriptionLooksSupported(const char* description) {
 
 std::string discoverFirstUri(const char* backends) {
 #ifdef HAVE_IIO_SCAN
-    struct iio_scan* scan = iio_scan(NULL, backends);
-    const int error = iio_err(scan);
-    if (error != 0) {
+    struct iio_scan_context* scan = iio_create_scan_context(backends, 0);
+    if (!scan) {
         return std::string();
     }
 
-    const size_t count = iio_scan_get_results_count(scan);
-    for (size_t i = 0; i < count; ++i) {
-        const char* uri = iio_scan_get_uri(scan, i);
-        const char* description = iio_scan_get_description(scan, i);
+    struct iio_context_info** info = NULL;
+    const ssize_t count = iio_scan_context_get_info_list(scan, &info);
+    if (count < 0) {
+        iio_scan_context_destroy(scan);
+        return std::string();
+    }
+
+    for (ssize_t i = 0; i < count; ++i) {
+        const char* uri = iio_context_info_get_uri(info[i]);
+        const char* description = iio_context_info_get_description(info[i]);
         const std::string connectUri = connectUriFromScanResult(uri);
         if (!connectUri.empty() && descriptionLooksSupported(description)) {
             std::string result(connectUri);
-            iio_scan_destroy(scan);
+            iio_context_info_list_free(info);
+            iio_scan_context_destroy(scan);
             return result;
         }
     }
-    iio_scan_destroy(scan);
+    iio_context_info_list_free(info);
+    iio_scan_context_destroy(scan);
 #else
     (void)backends;
 #endif
@@ -160,29 +167,32 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
                 }
 
                 for (int attempt = 1; attempt <= SCAN_ATTEMPTS && results.empty(); ++attempt) {
-                    struct iio_scan* scan = iio_scan(NULL, backends.c_str());
-                    const int error = iio_err(scan);
-                    if (error != 0) {
+                    struct iio_scan_context* scan = iio_create_scan_context(backends.c_str(), 0);
+                    if (!scan) {
                         if (attempt != SCAN_ATTEMPTS) {
                             std::this_thread::sleep_for(std::chrono::milliseconds(SCAN_RETRY_DELAY_MS));
                         }
                         continue;
                     }
 
-                    const size_t count = iio_scan_get_results_count(scan);
-                    for (size_t i = 0; i < count; ++i) {
-                        const char* uri = iio_scan_get_uri(scan, i);
-                        const char* description = iio_scan_get_description(scan, i);
-                        const std::string connectUri = connectUriFromScanResult(uri);
-                        const bool supported = descriptionLooksSupported(description);
-                        if (connectUri.empty() || !supported) {
-                            continue;
-                        }
+                    struct iio_context_info** info = NULL;
+                    const ssize_t count = iio_scan_context_get_info_list(scan, &info);
+                    if (count >= 0) {
+                        for (ssize_t i = 0; i < count; ++i) {
+                            const char* uri = iio_context_info_get_uri(info[i]);
+                            const char* description = iio_context_info_get_description(info[i]);
+                            const std::string connectUri = connectUriFromScanResult(uri);
+                            const bool supported = descriptionLooksSupported(description);
+                            if (connectUri.empty() || !supported) {
+                                continue;
+                            }
 
-                        SoapySDR::Kwargs result = makeResult(connectUri, "my_device " + connectUri, description ? description : "");
-                        results.push_back(result);
+                            SoapySDR::Kwargs result = makeResult(connectUri, "my_device " + connectUri, description ? description : "");
+                            results.push_back(result);
+                        }
+                        iio_context_info_list_free(info);
                     }
-                    iio_scan_destroy(scan);
+                    iio_scan_context_destroy(scan);
                     if (results.empty() && attempt != SCAN_ATTEMPTS) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(SCAN_RETRY_DELAY_MS));
                     }

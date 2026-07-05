@@ -183,7 +183,10 @@ int IIODevice::writeStream(SoapySDR::Stream* stream, const void* const* buffs, c
         throw std::runtime_error("only accept CF32 as output");
     }
     for (size_t i = 0; i < numElems; i++) {
-        if ((s->bp.end - s->bp.current) < 2) {
+        if (!s->bp.current || (s->bp.end - s->bp.current) < 2) {
+            if (s->bp.current) {
+                device->push_tx_buffer();
+            }
             s->bp = device->prepare_next_block_tx();
             s->current_buffer_finished = false;
         }
@@ -413,15 +416,16 @@ int IIODevice::deactivateStream(SoapySDR::Stream* stream, const int, const long 
     SoapySDR_logf(SOAPY_SDR_DEBUG, "deactivateStream");
     auto* s = reinterpret_cast<Stream*>(stream);
     for (size_t channel : s->channels) {
-        s->active.store(true, std::memory_order_release);
+        s->active.store(false, std::memory_order_release);
         if (s->direction == SOAPY_SDR_RX) {
             device->rx_channel_disable(static_cast<uint8_t>(channel));
         } else {
             int flags = 0;
-            size_t numElems = 1024 * 20;
+            size_t numElems = BLOCK_SIZE;
             std::vector<float> zeros(numElems * 2, 0.0f);
-            writeStream(stream, (const void**)&zeros, numElems, flags, NULL, NULL);
-            s->active.store(true, std::memory_order_release);
+            const void* zeroBuffs[] = {zeros.data()};
+            writeStream(stream, zeroBuffs, numElems, flags, 0, 0);
+            device->push_tx_buffer();
             device->tx_channel_disable(static_cast<uint8_t>(channel));
         }
     }

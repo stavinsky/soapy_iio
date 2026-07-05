@@ -1,6 +1,7 @@
 #include "ad9361.hpp"
 
 #include <SoapySDR/Logger.hpp>
+#include <cerrno>
 #include <sstream>
 #include <vector>
 
@@ -54,9 +55,8 @@ int AD9361::set_bandwidth_frequency(long long freq, bool output) {
 }
 double AD9361::get_bandwidth_frequency(bool output) {
     iio_channel* chan = iio_device_find_channel(ad9361_phy, "voltage0", output);
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_bandwidth");
     double value;
-    iio_attr_read_double(attr, &value);
+    iio_channel_attr_read_double(chan, "rf_bandwidth", &value);
     return value;
 }
 
@@ -84,13 +84,7 @@ int AD9361::set_gain(uint8_t channel, double value, bool output) {
         throw std::runtime_error("can't create context. check url");
     }
 
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
-    try {
-        iio_attr_write_double(attr, value);
-
-    } catch (...) {
-    }
-    return 0;
+    return iio_channel_attr_write_double(chan, "hardwaregain", value);
 }
 double AD9361::get_gain(uint8_t channel, bool output) {
     iio_channel* chan;
@@ -102,9 +96,8 @@ double AD9361::get_gain(uint8_t channel, bool output) {
         throw std::runtime_error("can't create context. check url");
     }
 
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "hardwaregain");
     double value;
-    iio_attr_read_double(attr, &value);
+    iio_channel_attr_read_double(chan, "hardwaregain", &value);
     return value;
 }
 void AD9361::set_gain_mode(uint8_t channel, bool output, bool automatic) {
@@ -116,8 +109,7 @@ void AD9361::set_gain_mode(uint8_t channel, bool output, bool automatic) {
     } else {
         throw std::runtime_error("can't create context. check url");
     }
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
-    iio_attr_write_string(attr, automatic ? "slow_attack" : "manual");
+    iio_channel_attr_write(chan, "gain_control_mode", automatic ? "slow_attack" : "manual");
 }
 
 bool AD9361::get_gain_mode(uint8_t channel, bool output) {
@@ -129,9 +121,8 @@ bool AD9361::get_gain_mode(uint8_t channel, bool output) {
     } else {
         throw std::runtime_error("can't create context. check url");
     }
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "gain_control_mode");
     char buf[64];
-    iio_attr_read_raw(attr, buf, sizeof(buf));
+    iio_channel_attr_read(chan, "gain_control_mode", buf, sizeof(buf));
     std::string mode(buf);
     SoapySDR_logf(SOAPY_SDR_DEBUG, "current gain mode is %s ", buf);
     return mode != "manual";
@@ -146,9 +137,8 @@ int AD9361::set_sample_rate(long long freq, bool output) {
 
 AD9361::AD9361(std::string url) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "constructor start");
-    ctx = iio_create_context(NULL, url.c_str());
-    int error = iio_err(ctx);
-    if (error != 0) {
+    ctx = iio_create_context_from_uri(url.c_str());
+    if (!ctx) {
         throw std::runtime_error("can't create context. check url");
     }
     ad9361_phy = iio_context_find_device(ctx, "ad9361-phy");
@@ -176,41 +166,16 @@ AD9361::AD9361(std::string url) {
         throw std::runtime_error("No device_input");
     }
 
-    rx_mask = iio_create_channels_mask(iio_device_get_channels_count(device_input));
-    if (!rx_mask) {
-        throw std::runtime_error("No rx_mask");
-    }
-    tx_mask = iio_create_channels_mask(iio_device_get_channels_count(device_output));
-    if (!tx_mask) {
-        throw std::runtime_error("No rx_mask");
-    }
     SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 constructor end");
 }
 
 AD9361::~AD9361() {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "AD9361 destructor start");
-    if (rx_mask) {
-        iio_channels_mask_destroy(rx_mask);
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_mask destroed ");
-    }
-    if (rx_stream) {
-        iio_stream_destroy(rx_stream);
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_stream destroed ");
-    }
-
     if (rx_buffer) {
         iio_buffer_destroy(rx_buffer);
         SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_buffer destroed ");
     }
 
-    if (tx_mask) {
-        iio_channels_mask_destroy(tx_mask);
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_mask destroed ");
-    }
-    if (tx_stream) {
-        iio_stream_destroy(tx_stream);
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_stream destroed ");
-    }
     if (tx_buffer) {
         iio_buffer_destroy(tx_buffer);
         SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_buffer destroed ");
@@ -222,22 +187,19 @@ AD9361::~AD9361() {
 }
 
 int AD9361::set_channel_param(iio_channel* channel, const char* key, long long value) {
-    const struct iio_attr* attr = iio_channel_find_attr(channel, key);
-    return iio_attr_write_longlong(attr, value);
+    return iio_channel_attr_write_longlong(channel, key, value);
 }
 int AD9361::set_channel_param_double(iio_channel* channel, const char* key, double value) {
-    const struct iio_attr* attr = iio_channel_find_attr(channel, key);
-    return iio_attr_write_double(attr, value);
+    return iio_channel_attr_write_double(channel, key, value);
 }
 long long AD9361::get_channel_param(iio_channel* channel, const char* key) {
-    const struct iio_attr* attr = iio_channel_find_attr(channel, key);
     long long val;
-    iio_attr_read_longlong(attr, &val);
+    iio_channel_attr_read_longlong(channel, key, &val);
     return val;
 }
 
 size_t AD9361::get_rx_sample_size() {
-    ssize_t sample_rate = iio_device_get_sample_size(device_input, rx_mask);
+    ssize_t sample_rate = iio_device_get_sample_size(device_input);
     return static_cast<size_t>(sample_rate);
 }
 void AD9361::rx_channel_enable(uint8_t channel) {
@@ -255,15 +217,15 @@ void AD9361::rx_channel_enable(uint8_t channel) {
         throw std::runtime_error("unable to get Q channel");
     }
 
-    iio_channel_enable(rx_chan[channel].rx_ch_i, rx_mask);
-    iio_channel_enable(rx_chan[channel].rx_ch_q, rx_mask);
-    rx_buffer = iio_device_create_buffer(device_input, 0, rx_mask);
-    if (iio_err(rx_buffer) != 0) {
-        throw std::runtime_error("No rx_buffer");
+    if (rx_buffer) {
+        iio_buffer_destroy(rx_buffer);
+        rx_buffer = NULL;
     }
-    rx_stream = iio_buffer_create_stream(rx_buffer, 4, BLOCK_SIZE);
-    if (iio_err(rx_stream) != 0) {
-        throw std::runtime_error("No rx_stream");
+    iio_channel_enable(rx_chan[channel].rx_ch_i);
+    iio_channel_enable(rx_chan[channel].rx_ch_q);
+    rx_buffer = iio_device_create_buffer(device_input, BLOCK_SIZE, false);
+    if (!rx_buffer) {
+        throw std::runtime_error("No rx_buffer");
     }
     SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_enable end");
 }
@@ -276,9 +238,13 @@ void AD9361::rx_channel_disable(uint8_t channel) {
     if (!rx_chan[channel].rx_ch_q) {
         throw std::runtime_error("unable to get Q channel");
     }
-    if (rx_mask && rx_chan[channel].rx_ch_i && rx_chan[channel].rx_ch_q) {
-        iio_channel_disable(rx_chan[channel].rx_ch_i, rx_mask);
-        iio_channel_disable(rx_chan[channel].rx_ch_q, rx_mask);
+    if (rx_chan[channel].rx_ch_i && rx_chan[channel].rx_ch_q) {
+        if (rx_buffer) {
+            iio_buffer_destroy(rx_buffer);
+            rx_buffer = NULL;
+        }
+        iio_channel_disable(rx_chan[channel].rx_ch_i);
+        iio_channel_disable(rx_chan[channel].rx_ch_q);
         SoapySDR_logf(SOAPY_SDR_DEBUG, "rx_channel_disabled");
     }
 }
@@ -298,15 +264,15 @@ void AD9361::tx_channel_enable(uint8_t channel) {
         throw std::runtime_error("unable to get Q channel");
     }
 
-    iio_channel_enable(tx_chan[channel].tx_ch_i, tx_mask);
-    iio_channel_enable(tx_chan[channel].tx_ch_q, tx_mask);
-    tx_buffer = iio_device_create_buffer(device_output, 0, tx_mask);
-    if (iio_err(tx_buffer) != 0) {
-        throw std::runtime_error("No tx_buffer");
+    if (tx_buffer) {
+        iio_buffer_destroy(tx_buffer);
+        tx_buffer = NULL;
     }
-    tx_stream = iio_buffer_create_stream(tx_buffer, 4, BLOCK_SIZE);
-    if (iio_err(tx_stream) != 0) {
-        throw std::runtime_error("No tx_stream");
+    iio_channel_enable(tx_chan[channel].tx_ch_i);
+    iio_channel_enable(tx_chan[channel].tx_ch_q);
+    tx_buffer = iio_device_create_buffer(device_output, BLOCK_SIZE, false);
+    if (!tx_buffer) {
+        throw std::runtime_error("No tx_buffer");
     }
 
     SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_channel_enable end");
@@ -320,47 +286,58 @@ void AD9361::tx_channel_disable(uint8_t channel) {
     if (!tx_chan[channel].tx_ch_q) {
         throw std::runtime_error("unable to get Q channel");
     }
-    if (tx_mask && tx_chan[channel].tx_ch_i && tx_chan[channel].tx_ch_q) {
-        iio_channel_disable(tx_chan[channel].tx_ch_i, tx_mask);
-        iio_channel_disable(tx_chan[channel].tx_ch_q, tx_mask);
+    if (tx_chan[channel].tx_ch_i && tx_chan[channel].tx_ch_q) {
+        if (tx_buffer) {
+            iio_buffer_destroy(tx_buffer);
+            tx_buffer = NULL;
+        }
+        iio_channel_disable(tx_chan[channel].tx_ch_i);
+        iio_channel_disable(tx_chan[channel].tx_ch_q);
         SoapySDR_logf(SOAPY_SDR_DEBUG, "tx_channel_disabled");
     }
 }
 BlockPointer AD9361::prepare_next_block() {
     // TODO: set timeout
-    const iio_block* rx_block = iio_stream_get_next_block(rx_stream);
-    int err = iio_err(rx_block);
-    if (err) {
-        if (err == -60) {
+    ssize_t bytes = iio_buffer_refill(rx_buffer);
+    if (bytes < 0) {
+        if (bytes == -ETIMEDOUT) {
             throw TimeoutError("get next block has timed out");
         }
-        printf("error from libiio: %d ", err);
+        printf("error from libiio: %d ", static_cast<int>(bytes));
         throw std::runtime_error("unable to receive block %d");
     }
 
-    int16_t* p_end = reinterpret_cast<int16_t*>(iio_block_end(rx_block));
+    int16_t* p_end = reinterpret_cast<int16_t*>(iio_buffer_end(rx_buffer));
     iio_channel* ch = (rx_chan[0].rx_ch_i) ? rx_chan[0].rx_ch_i : rx_chan[1].rx_ch_i;
     if (!ch) {
         throw std::runtime_error("can't prepare block. wrong channel selected");
     }
-    int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(rx_block, ch));
+    int16_t* p_start = reinterpret_cast<int16_t*>(iio_buffer_first(rx_buffer, ch));
     return {p_start, p_end};
 }
 
 BlockPointer AD9361::prepare_next_block_tx() {
-    const iio_block* tx_block = iio_stream_get_next_block(tx_stream);
-    int err = iio_err(tx_block);
-    if (err) {
-        throw std::runtime_error("unable to receive block");
+    if (!tx_buffer) {
+        throw std::runtime_error("tx buffer is not created");
     }
 
-    int16_t* p_end = reinterpret_cast<int16_t*>(iio_block_end(tx_block));
+    int16_t* p_end = reinterpret_cast<int16_t*>(iio_buffer_end(tx_buffer));
     iio_channel* ch = (tx_chan[0].tx_ch_i) ? tx_chan[0].tx_ch_i : tx_chan[1].tx_ch_i;
     if (!ch) {
         throw std::runtime_error("can't prepare block. wrong channel selected");
     }
-    int16_t* p_start = reinterpret_cast<int16_t*>(iio_block_first(tx_block, ch));
+    int16_t* p_start = reinterpret_cast<int16_t*>(iio_buffer_first(tx_buffer, ch));
     return {p_start, p_end};
+}
+
+void AD9361::push_tx_buffer() {
+    if (!tx_buffer) {
+        return;
+    }
+    ssize_t bytes = iio_buffer_push(tx_buffer);
+    if (bytes < 0) {
+        throw std::runtime_error("unable to push tx buffer");
+    }
 }
 
 std::vector<std::string> AD9361::get_available_rf_ports(uint8_t channel, bool output) {
@@ -372,9 +349,8 @@ std::vector<std::string> AD9361::get_available_rf_ports(uint8_t channel, bool ou
     } else {
         throw std::runtime_error("can't create context. check url");
     }
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_port_select_available");
     char buf[500];
-    iio_attr_read_raw(attr, buf, sizeof(buf));
+    iio_channel_attr_read(chan, "rf_port_select_available", buf, sizeof(buf));
     return split_string(buf);
 }
 ssize_t AD9361::rf_port_select(uint8_t channel, bool output, std::string rf_port) {
@@ -386,9 +362,7 @@ ssize_t AD9361::rf_port_select(uint8_t channel, bool output, std::string rf_port
     } else {
         throw std::runtime_error("can't create context. check url");
     }
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_port_select");
-
-    return iio_attr_write_string(attr, rf_port.c_str());
+    return iio_channel_attr_write(chan, "rf_port_select", rf_port.c_str());
 }
 
 std::string AD9361::get_rf_port(uint8_t channel, bool output) {
@@ -400,15 +374,13 @@ std::string AD9361::get_rf_port(uint8_t channel, bool output) {
     } else {
         throw std::runtime_error("can't create context. check url");
     }
-    const struct iio_attr* attr = iio_channel_find_attr(chan, "rf_port_select");
     char buf[500];
-    iio_attr_read_raw(attr, buf, sizeof(buf));
+    iio_channel_attr_read(chan, "rf_port_select", buf, sizeof(buf));
     return std::string(buf);
 }
 
 void AD9361::load_filter_from_buffer(std::vector<uint8_t> buffer) {
-    const iio_attr* filter_fir_config = iio_device_find_attr(ad9361_phy, "filter_fir_config");
-    ssize_t bytes = iio_attr_write_raw(filter_fir_config, buffer.data(), buffer.size());
+    ssize_t bytes = iio_device_attr_write_raw(ad9361_phy, "filter_fir_config", buffer.data(), buffer.size());
     if (bytes <= 0) {
         throw std::runtime_error("loading filter failed");
     }
@@ -416,8 +388,7 @@ void AD9361::load_filter_from_buffer(std::vector<uint8_t> buffer) {
 
 void AD9361::fir_filter_enable(bool en) {
     iio_channel* chan_out = iio_device_find_channel(ad9361_phy, "out", false);
-    const iio_attr* ch0_filter_fir_en = iio_channel_find_attr(chan_out, "voltage_filter_fir_en");
-    int err = iio_attr_write_bool(ch0_filter_fir_en, en);
+    int err = iio_channel_attr_write_bool(chan_out, "voltage_filter_fir_en", en);
     if (err != 0) {
         throw std::runtime_error("changing filter state failed");
     }

@@ -3,9 +3,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-extern "C" {
-#include <iio/iio-debug.h>
-}
 #include "ad9361.hpp"
 #include "iio.h"
 
