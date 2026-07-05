@@ -5,10 +5,13 @@
 #include <SoapySDR/Logger.hpp>
 #include <SoapySDR/Registry.hpp>
 
+#include <mutex>
+
 #include "ad9361.hpp"
 #define BLOCK_SIZE (125 * 1024)  // TODO: make parameter
 
 using namespace std;
+class Stream;
 class IIODevice : public SoapySDR::Device {
    public:
     std::string getDriverKey(void) const;
@@ -61,4 +64,7 @@ class IIODevice : public SoapySDR::Device {
 
    private:
     AD9361* device;
+    mutable std::mutex stream_mutex;
+    Stream* active_rx_stream = nullptr;
+    Stream* active_tx_stream = nullptr;
 };

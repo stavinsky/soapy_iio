@@ -12,6 +12,14 @@
 #define MHZ(x) (x * 1000000.0)
 #define GHZ(x) (x * 1000000000.0)
 
+static uint8_t channel_mask_from_stream_channels(const std::vector<size_t>& channels) {
+    uint8_t mask = 0;
+    for (size_t channel : channels) {
+        mask |= static_cast<uint8_t>(1 << channel);
+    }
+    return mask;
+}
+
 std::string IIODevice::getDriverKey(void) const {
     return "my_device";
 }
@@ -62,6 +70,20 @@ SoapySDR::Stream* IIODevice::setupStream(const int direction, const std::string&
     std::vector<size_t> chans = channels.empty() ? std::vector<size_t>{0} : channels;
     if (chans.size() > 2) {
         throw std::runtime_error("currently only one channel is supported");
+    }
+    if (!std::is_sorted(chans.begin(), chans.end())) {
+        throw std::runtime_error("stream channels must be in ascending order");
+    }
+    if (std::adjacent_find(chans.begin(), chans.end()) != chans.end()) {
+        throw std::runtime_error("duplicate stream channels are not supported");
+    }
+    for (size_t channel : chans) {
+        if (direction == SOAPY_SDR_RX && channel >= getNumChannels(direction)) {
+            throw std::runtime_error("invalid rx stream channel");
+        }
+        if (direction == SOAPY_SDR_TX && channel >= getNumChannels(direction)) {
+            throw std::runtime_error("invalid tx stream channel");
+        }
     }
     Stream* stream = new Stream();
     stream->direction = direction;
@@ -143,7 +165,7 @@ int IIODevice::readStream(SoapySDR::Stream* stream, void* const* buffs_orig, con
                 return static_cast<int>(cnt);
             }
             try {
-                s->bp = device->prepare_next_block();
+                s->bp = device->prepare_next_block(static_cast<uint8_t>(s->channels.front()));
             } catch (const TimeoutError& e) {
                 return SOAPY_SDR_TIMEOUT;
             } catch (...) {
@@ -187,7 +209,7 @@ int IIODevice::writeStream(SoapySDR::Stream* stream, const void* const* buffs, c
             if (s->bp.current) {
                 device->push_tx_buffer();
             }
-            s->bp = device->prepare_next_block_tx();
+            s->bp = device->prepare_next_block_tx(static_cast<uint8_t>(s->channels.front()));
             s->current_buffer_finished = false;
         }
         float i_float = output_buffer[i * 2];      // I component
@@ -399,15 +421,22 @@ int IIODevice::activateStream(SoapySDR::Stream* stream, const int flags, const l
     (void)flags;
     SoapySDR_logf(SOAPY_SDR_DEBUG, "activateStream");
     auto* s = reinterpret_cast<Stream*>(stream);
-    for (size_t channel : s->channels) {
-        if (s->direction == SOAPY_SDR_RX) {
-            device->rx_channel_enable(static_cast<uint8_t>(channel));
-        } else {
-            device->tx_channel_enable(static_cast<uint8_t>(channel));
-        }
+    std::lock_guard<std::mutex> lock(stream_mutex);
+    Stream*& active_stream = (s->direction == SOAPY_SDR_RX) ? active_rx_stream : active_tx_stream;
+    if (active_stream && active_stream != s) {
+        throw std::runtime_error("another stream is already active in this direction");
     }
 
+    const uint8_t channels = channel_mask_from_stream_channels(s->channels);
+    if (s->direction == SOAPY_SDR_RX) {
+        device->rx_channels_configure(channels);
+    } else {
+        device->tx_channels_configure(channels);
+    }
+    s->bp = {};
+    s->current_buffer_finished = true;
     s->active.store(true, std::memory_order_release);
+    active_stream = s;
     SoapySDR_logf(SOAPY_SDR_DEBUG, "activateStream end");
     return 0;
 }
@@ -415,20 +444,30 @@ int IIODevice::activateStream(SoapySDR::Stream* stream, const int flags, const l
 int IIODevice::deactivateStream(SoapySDR::Stream* stream, const int, const long long) {
     SoapySDR_logf(SOAPY_SDR_DEBUG, "deactivateStream");
     auto* s = reinterpret_cast<Stream*>(stream);
-    for (size_t channel : s->channels) {
+    std::lock_guard<std::mutex> lock(stream_mutex);
+    Stream*& active_stream = (s->direction == SOAPY_SDR_RX) ? active_rx_stream : active_tx_stream;
+    if (active_stream != s) {
         s->active.store(false, std::memory_order_release);
-        if (s->direction == SOAPY_SDR_RX) {
-            device->rx_channel_disable(static_cast<uint8_t>(channel));
-        } else {
-            int flags = 0;
-            size_t numElems = BLOCK_SIZE;
-            std::vector<float> zeros(numElems * 2, 0.0f);
-            const void* zeroBuffs[] = {zeros.data()};
-            writeStream(stream, zeroBuffs, numElems, flags, 0, 0);
-            device->push_tx_buffer();
-            device->tx_channel_disable(static_cast<uint8_t>(channel));
-        }
+        s->bp = {};
+        return 0;
     }
+
+    if (s->direction == SOAPY_SDR_RX) {
+        s->active.store(false, std::memory_order_release);
+        s->bp = {};
+        device->rx_channels_configure(0);
+    } else {
+        int flags = 0;
+        size_t numElems = BLOCK_SIZE;
+        std::vector<float> zeros(numElems * 2, 0.0f);
+        const void* zeroBuffs[] = {zeros.data()};
+        writeStream(stream, zeroBuffs, numElems, flags, 0, 0);
+        device->push_tx_buffer();
+        s->active.store(false, std::memory_order_release);
+        s->bp = {};
+        device->tx_channels_configure(0);
+    }
+    active_stream = nullptr;
     return 0;
 }
 
