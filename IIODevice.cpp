@@ -117,6 +117,7 @@ std::vector<std::string> IIODevice::getStreamFormats(const int direction, const 
         formats.push_back(SOAPY_SDR_CF32);
         return formats;
     }
+    formats.push_back(SOAPY_SDR_CS16);
     formats.push_back(SOAPY_SDR_CF32);
 
     return formats;
@@ -199,10 +200,11 @@ int IIODevice::writeStream(SoapySDR::Stream* stream, const void* const* buffs, c
     // const float scale = 2047.0f;
 
     const float* output_buffer = reinterpret_cast<float const*>(buffs[0]);
+    const int16_t* output_buffer_int = reinterpret_cast<int16_t const*>(buffs[0]);
     Stream* s = reinterpret_cast<Stream*>(stream);
 
-    if (s->format != SOAPY_SDR_CF32) {
-        throw std::runtime_error("only accept CF32 as output");
+    if (s->format != SOAPY_SDR_CF32 && s->format != SOAPY_SDR_CS16) {
+        throw std::runtime_error("only accept CF32 or CS16 as output");
     }
     for (size_t i = 0; i < numElems; i++) {
         if (!s->bp.current || (s->bp.end - s->bp.current) < 2) {
@@ -212,13 +214,22 @@ int IIODevice::writeStream(SoapySDR::Stream* stream, const void* const* buffs, c
             s->bp = device->prepare_next_block_tx(static_cast<uint8_t>(s->channels.front()));
             s->current_buffer_finished = false;
         }
-        float i_float = output_buffer[i * 2];      // I component
-        float q_float = output_buffer[i * 2 + 1];  // Q component
-        // int16_t i_int = static_cast<int16_t>(std::round(i_float * scale)) << 4;
-        // int16_t q_int = static_cast<int16_t>(std::round(q_float * scale)) << 4;
+        int16_t i_int;
+        int16_t q_int;
+        if (s->format == SOAPY_SDR_CS16) {
+            const int16_t i_12bit = static_cast<int16_t>(output_buffer_int[i * 2] / 16);
+            const int16_t q_12bit = static_cast<int16_t>(output_buffer_int[i * 2 + 1] / 16);
+            i_int = static_cast<int16_t>(i_12bit * 16);
+            q_int = static_cast<int16_t>(q_12bit * 16);
+        } else {
+            float i_float = output_buffer[i * 2];      // I component
+            float q_float = output_buffer[i * 2 + 1];  // Q component
+            // int16_t i_int = static_cast<int16_t>(std::round(i_float * scale)) << 4;
+            // int16_t q_int = static_cast<int16_t>(std::round(q_float * scale)) << 4;
 
-        int16_t i_int = static_cast<int16_t>(std::round(i_float * scale));
-        int16_t q_int = static_cast<int16_t>(std::round(q_float * scale));
+            i_int = static_cast<int16_t>(std::round(i_float * scale));
+            q_int = static_cast<int16_t>(std::round(q_float * scale));
+        }
         // int16_t i_int = std::clamp(
         //                     static_cast<int16_t>(std::round(i_float * scale)),
         //                     static_cast<int16_t>(-2047),
