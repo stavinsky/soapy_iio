@@ -15,6 +15,7 @@
 #include <set>
 #include <string>
 #include <thread>
+#include <cctype>
 
 #include <iio.h>
 
@@ -100,8 +101,15 @@ bool descriptionLooksSupported(const char* description) {
         return true;
     }
 
-    const std::string desc(description);
-    return desc.find("ad9361-phy") != std::string::npos ||
+    std::string desc(description);
+    std::transform(desc.begin(), desc.end(), desc.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+
+    return desc.find("ad9361") != std::string::npos ||
+           desc.find("ad9363") != std::string::npos ||
+           desc.find("ad9364") != std::string::npos ||
+           desc.find("pluto") != std::string::npos ||
            desc.find("cf-ad9361-lpc") != std::string::npos ||
            desc.find("cf-ad9361-dds-core-lpc") != std::string::npos;
 }
@@ -183,6 +191,11 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
                             const char* description = iio_context_info_get_description(info[i]);
                             const std::string connectUri = connectUriFromScanResult(uri);
                             const bool supported = descriptionLooksSupported(description);
+                            SoapySDR_logf(SOAPY_SDR_DEBUG,
+                                          "MyDevice: IIO scan candidate uri='%s' description='%s' supported=%s",
+                                          uri ? uri : "",
+                                          description ? description : "",
+                                          supported ? "true" : "false");
                             if (connectUri.empty() || !supported) {
                                 continue;
                             }
@@ -191,6 +204,13 @@ SoapySDR::KwargsList findMyDevice(const SoapySDR::Kwargs& args) {
                             results.push_back(result);
                         }
                         iio_context_info_list_free(info);
+                    } else {
+                        SoapySDR_logf(SOAPY_SDR_WARNING,
+                                      "MyDevice: IIO scan failed for backends '%s' on attempt %d/%d: %zd",
+                                      backends.c_str(),
+                                      attempt,
+                                      SCAN_ATTEMPTS,
+                                      count);
                     }
                     iio_scan_context_destroy(scan);
                     if (results.empty() && attempt != SCAN_ATTEMPTS) {
